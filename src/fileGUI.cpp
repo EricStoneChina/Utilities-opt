@@ -999,11 +999,11 @@ void viewFileAsText(char* filename) {
   unsigned char* asrc = NULL;
   //Get file contents
   int hFile = fileOpen(filename); // Get handle
-  unsigned int filesize = 0;
+  int filesize = 0;
   if(hFile >= 0) // Check if it opened
   { //opened
     filesize = Bfile_GetFileSize_OS(hFile);
-    if(!filesize) {
+    if(filesize <= 0) {
       Bfile_CloseFile_OS(hFile);
       return;
     }
@@ -1041,12 +1041,16 @@ void viewFileAsText(char* filename) {
   }
   if(text.numelements > MAX_TEXTVIEWER_LINES) text.numelements = MAX_TEXTVIEWER_LINES;
 
-  textElement elem[text.numelements];
+  textElement* elem = (textElement*)malloc(text.numelements*sizeof(textElement));
+  if(elem == NULL) {
+    free(asrc);
+    return;
+  }
   text.elements = elem;
   elem[0].text = (char*)asrc;
   int ecur = 1;
   bcur = 0;
-  while(bcur < filesize && ecur <= text.numelements) {
+  while(bcur < (unsigned int)filesize && ecur <= text.numelements) {
     int jump = 1;
     if(*(asrc+bcur) == '\r' || *(asrc+bcur) == '\n') {
       // char after the next one (\n) will be the start of a new line
@@ -1061,6 +1065,7 @@ void viewFileAsText(char* filename) {
     bcur += jump;
   }
   doTextArea(&text);
+  free(elem);
   free(asrc);
 }
 
