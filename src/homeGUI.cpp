@@ -495,8 +495,11 @@ void eventsPane(int retkey, int* pane_keycache) {
   if (numevents > 0) {
     int getnum = (numevents>HOME_EVENTS_DISPLAY_FULL?HOME_EVENTS_DISPLAY_FULL:numevents);
     // ^ number of events to parse. allocate memory only for the few events we want to display
-    calevents = (CalendarEvent*)alloca(getnum*sizeof(CalendarEvent));
-    getEvents(&thisday, CALENDARFOLDER, calevents, HOME_EVENTS_DISPLAY_FULL);
+    calevents = (CalendarEvent*)malloc(getnum*sizeof(CalendarEvent));
+    if(calevents != NULL)
+      getEvents(&thisday, CALENDARFOLDER, calevents, HOME_EVENTS_DISPLAY_FULL);
+    else
+      numevents = 0;
   }
   if (getSetting(SETTING_THEME)) {
     Bdisp_Fill_VRAM( COLOR_BLACK, 2 ); //fill between the status area and f-key area
@@ -509,6 +512,7 @@ void eventsPane(int retkey, int* pane_keycache) {
   if(getSetting(SETTING_SHOW_CALENDAR_BUSY_MAP))
     drawBusymapDay(&thisday, 0, LCD_HEIGHT_PX-44, LCD_WIDTH_PX, 15, 1,0,0);
   paneHandleBasicKeys(retkey, pane_keycache);
+  free(calevents);
 }
 
 void memoryUsagePane(int retkey, int* pane_keycache) {

@@ -39,8 +39,17 @@ int viewTasksChild(Menu* menu) {
   EventDate taskday;
   
   menu->numitems = getEvents(&taskday, CALENDARFOLDER, NULL); // get event count
-  CalendarEvent* tasks = (CalendarEvent*)alloca(menu->numitems*sizeof(CalendarEvent));
-  MenuItem* menuitems = (MenuItem*)alloca(menu->numitems*sizeof(MenuItem));
+  CalendarEvent* tasks = menu->numitems > 0 ?
+    (CalendarEvent*)malloc(menu->numitems*sizeof(CalendarEvent)) : NULL;
+  MenuItem* menuitems = menu->numitems > 0 ?
+    (MenuItem*)malloc(menu->numitems*sizeof(MenuItem)) : NULL;
+  if(menu->numitems > 0 && (tasks == NULL || menuitems == NULL)) {
+    free(tasks);
+    free(menuitems);
+    menu->numitems = 0;
+    menu->items = NULL;
+    return 0;
+  }
   menu->numitems = getEvents(&taskday, CALENDARFOLDER, tasks);
   int activecount = 0;
   for(int curitem = 0; curitem < menu->numitems; curitem++) {
@@ -63,6 +72,8 @@ int viewTasksChild(Menu* menu) {
     int res = doMenu(menu);
     switch(res) {
       case MENU_RETURN_EXIT:
+        free(tasks);
+        free(menuitems);
         return 0;
         break;
       case KEY_CTRL_F1:
@@ -74,6 +85,8 @@ int viewTasksChild(Menu* menu) {
           AUX_DisplayErrorMessage( 0x2E );
         } else {
           if(EVENTEDITOR_RETURN_CONFIRM == eventEditor(0, 0, 0, EVENTEDITORTYPE_ADD, NULL, 1)) {
+            free(tasks);
+            free(menuitems);
             return 1;
           }
         }
@@ -84,26 +97,38 @@ int viewTasksChild(Menu* menu) {
              EVENTEDITOR_RETURN_CONFIRM)
             replaceEventFile(&tasks[menu->selection-1].startdate, tasks, CALENDARFOLDER,
                              menu->numitems);
+          free(tasks);
+          free(menuitems);
           return 1;
         }
         break;
       case KEY_CTRL_F4:
       case KEY_CTRL_DEL:
-        if(menu->numitems > 0)
+        if(menu->numitems > 0) {
           if(EVENTDELETE_RETURN_CONFIRM ==
-             deleteEventPrompt(tasks, menu->numitems, menu->selection-1, 1))
+             deleteEventPrompt(tasks, menu->numitems, menu->selection-1, 1)) {
+            free(tasks);
+            free(menuitems);
             return 1;
+          }
+        }
         break;
       case KEY_CTRL_F5:
-        if(menu->numitems > 0)
-          if(EVENTDELETE_RETURN_CONFIRM == deleteAllEventsPrompt(0, 0, 0, 1))
+        if(menu->numitems > 0) {
+          if(EVENTDELETE_RETURN_CONFIRM == deleteAllEventsPrompt(0, 0, 0, 1)) {
+            free(tasks);
+            free(menuitems);
             return 1;
+          }
+        }
         break;
       case KEY_CTRL_F6:
         if(menu->numitems > 0) {
           tasks[menu->selection-1].repeat = !tasks[menu->selection-1].repeat;
           replaceEventFile(&tasks[menu->selection-1].startdate, tasks, CALENDARFOLDER,
                            menu->numitems);
+          free(tasks);
+          free(menuitems);
           return 1;
         }
         break;
@@ -114,6 +139,8 @@ int viewTasksChild(Menu* menu) {
           if(EVENTEDITOR_RETURN_CONFIRM == setCategoryPrompt(&tasks[menu->selection-1])) {
             replaceEventFile(&tasks[menu->selection-1].startdate, tasks, CALENDARFOLDER,
                              menu->numitems);
+            free(tasks);
+            free(menuitems);
             return 1;
           }
         }

@@ -143,7 +143,13 @@ int addinManagerChild(Menu* menu) {
   AddIn addins[200]; 
   
   menu->numitems = getAddins(addins);
-  MenuItem* menuitems = (MenuItem*)alloca(menu->numitems*sizeof(MenuItem));
+  MenuItem* menuitems = menu->numitems > 0 ?
+    (MenuItem*)malloc(menu->numitems*sizeof(MenuItem)) : NULL;
+  if(menu->numitems > 0 && menuitems == NULL) {
+    menu->numitems = 0;
+    menu->items = NULL;
+    return 0;
+  }
   menu->items = menuitems;
  
   Bdisp_AllClr_VRAM();
@@ -156,6 +162,7 @@ int addinManagerChild(Menu* menu) {
   
   char buffer[MAX_FILENAME_SIZE+1];
   unsigned short oldpath[MAX_FILENAME_SIZE+1];
+  int result = 1;
   switch(doMenu(menu)) {
     case KEY_CTRL_F1:
       if(menu->numitems > 0) {
@@ -170,7 +177,8 @@ int addinManagerChild(Menu* menu) {
           Bfile_WriteFile_OS(hFile, buffer, 2);
           Bfile_CloseFile_OS(hFile);
         }
-        return 1; //reload list
+        result = 1; //reload list
+        break;
       }
       break;
     case KEY_CTRL_F2:
@@ -185,12 +193,14 @@ int addinManagerChild(Menu* menu) {
           Bfile_StrToName_ncpy(oldpath, buffer, MAX_FILENAME_SIZE+1);
           Bfile_DeleteEntry( oldpath );
         }
-        return 1;
+        result = 1;
+        break;
       }
       break;
-    case MENU_RETURN_EXIT: return 0; break;
+    case MENU_RETURN_EXIT: result = 0; break;
   }
-  return 1;
+  free(menuitems);
+  return result;
 }
 
 void changeFKeyColor() {
