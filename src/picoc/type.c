@@ -302,7 +302,6 @@ void TypeParseEnum(struct ParseState *Parser, struct ValueType **Typ)
     struct Value *LexValue;
     struct Value InitValue;
     enum LexToken Token;
-    struct ValueType *EnumType;
     int EnumValue = 0;
     char *EnumIdentifier;
     
@@ -319,7 +318,7 @@ void TypeParseEnum(struct ParseState *Parser, struct ValueType **Typ)
         EnumIdentifier = PlatformMakeTempName(TempNameBuf);
     }
 
-    EnumType = TypeGetMatching(Parser, &UberType, TypeEnum, 0, EnumIdentifier, Token != TokenLeftBrace);
+    TypeGetMatching(Parser, &UberType, TypeEnum, 0, EnumIdentifier, Token != TokenLeftBrace);
     *Typ = &IntType;
     if (Token != TokenLeftBrace)
     { 

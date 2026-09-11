@@ -44,9 +44,9 @@ else
 MKG3AFLAGS := -V 02.01.0001 -n basic:Utilities -n internal:UTILS -i uns:../unselected.bmp -i sel:../selected.bmp
 endif
 
-COMMONFLAGS = -Os -flto -fno-exceptions -Wall $(MACHDEP) $(INCLUDE) -D__GIT_VERSION=\"$(GIT_VERSION)\" -D__GIT_TIMESTAMP=\"$(GIT_TIMESTAMP)\" $(CUSTOM_FLAGS)
+COMMONFLAGS = -Os -flto -fno-exceptions -fno-builtin-calloc -Wall $(MACHDEP) $(INCLUDE) -D__GIT_VERSION=\"$(GIT_VERSION)\" -D__GIT_TIMESTAMP=\"$(GIT_TIMESTAMP)\" $(CUSTOM_FLAGS)
 CFLAGS	= -std=c99 $(COMMONFLAGS)
-CXXFLAGS	=	-std=c++11 $(COMMONFLAGS)
+CXXFLAGS	=	-std=c++11 $(COMMONFLAGS) -fno-rtti
 
 LINKER_SCRIPT := $(FXCGSDK)/common/prizm.ld
 ifeq ($(wildcard $(LINKER_SCRIPT)),)
