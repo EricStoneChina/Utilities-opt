@@ -242,8 +242,10 @@ void timeToString(char *buffer, int h, int min, int sec, int format, int showSec
 long long int currentUEBT() { // please note, this is milliseconds from epoch and not seconds
   unsigned int fhour=0,fminute=0,fsecond=0,millisecond=0;
   RTC_GetTime(&fhour, &fminute, &fsecond, &millisecond);
-  return dateTimeToUEBT(getCurrentYear(), getCurrentMonth(), getCurrentDay(), getCurrentHour(),
-                        getCurrentMinute(), getCurrentSecond(), millisecond);
+  // RTC_GetTime already returns a consistent time snapshot. Re-reading the hour, minute and
+  // second registers here costs extra MMIO accesses and can cross a second boundary.
+  return dateTimeToUEBT(getCurrentYear(), getCurrentMonth(), getCurrentDay(), (int)fhour,
+                        (int)fminute, (int)fsecond, (int)millisecond);
 }
 
 long long int currentUTCUEBT() {
