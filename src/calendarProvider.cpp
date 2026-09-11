@@ -441,8 +441,10 @@ int getEvents(EventDate* startdate, const char* folder, CalendarEvent* calEvents
         stringToSimpleEvent(curevent == 0 ?
                             token+sizeof(FILE_HEADER)-1 : token, &simpleCalEvents[curevent]);
       curevent++;
-      if (strlen(src) < 5) { // 5 bytes is not enough space to hold an event,
-                             // so there are no more events to process...
+      if (!src[0] || !src[1] || !src[2] || !src[3] || !src[4]) {
+        // Five bytes is not enough space to hold an event, so there are no
+        // more events to process. Check directly instead of scanning the
+        // entire remaining file with strlen on every event.
         break; // stop now, before the strtok token becomes empty
       }
       if (curevent >= MAX_DAY_EVENTS || (limit > 0 && curevent >= limit)) {
@@ -471,11 +473,10 @@ int getEvents(EventDate* startdate, const char* folder, CalendarEvent* calEvents
   }
 }
 
-void getEventCountsForMonthHelper(EventDate* date, int count, int* busydays) {
-  if(count <= 0) return;
-  CalendarEvent* events = (CalendarEvent*)malloc(count*sizeof(CalendarEvent));
-  if(events == NULL) return;
-  count = getEvents(date, CALENDARFOLDER, events);
+int getEventCountsForMonthHelper(EventDate* date, int* busydays) {
+  CalendarEvent* events = (CalendarEvent*)malloc(MAX_DAY_EVENTS*sizeof(CalendarEvent));
+  if(events == NULL) return 0;
+  int count = getEvents(date, CALENDARFOLDER, events, MAX_DAY_EVENTS);
   for(int curitem = 0; curitem < count; curitem++) {
     long int datediff = dateToDays(events[curitem].enddate.year,
                                    events[curitem].enddate.month,
@@ -498,6 +499,7 @@ void getEventCountsForMonthHelper(EventDate* date, int count, int* busydays) {
     } else setDBcorruptFlag(1); // end date is before start date, which is invalid. 
   }
   free(events);
+  return count;
 }
 void getEventCountsForMonth(int year, int month, int* dbuffer, int* busydays) {
   memset(dbuffer, 0, 32*sizeof(int));
@@ -524,8 +526,7 @@ void getEventCountsForMonth(int year, int month, int* dbuffer, int* busydays) {
         if(fd >= 1 && fd <= 31) {
           EventDate thisday;
           thisday.year=year; thisday.month=month; thisday.day=fd;
-          dbuffer[fd] = getEvents(&thisday, CALENDARFOLDER, NULL); // get count only
-          if(dbuffer[fd] > 0) getEventCountsForMonthHelper(&thisday, dbuffer[fd], busydays);
+          dbuffer[fd] = getEventCountsForMonthHelper(&thisday, busydays);
         }
       }
     }
@@ -534,14 +535,13 @@ void getEventCountsForMonth(int year, int month, int* dbuffer, int* busydays) {
   Bfile_FindClose(findhandle);
 }
 
-int SearchHelper(EventDate* date, SimpleCalendarEvent* calEvents, int daynumevents,
+int SearchHelper(EventDate* date, SimpleCalendarEvent* calEvents,
                  const char* folder, char* needle, int limit) {
   // limit is the maximum number of results
   int index = 0;
-  if(daynumevents <= 0) return 0;
-  CalendarEvent* dayEvents = (CalendarEvent*)malloc(daynumevents*sizeof(CalendarEvent));
+  CalendarEvent* dayEvents = (CalendarEvent*)malloc(MAX_DAY_EVENTS*sizeof(CalendarEvent));
   if(dayEvents == NULL) return 0;
-  daynumevents = getEvents(date, folder, dayEvents);
+  int daynumevents = getEvents(date, folder, dayEvents, MAX_DAY_EVENTS);
   for(int curitem = 0; curitem < daynumevents; curitem++) {
     if(NULL != strcasestr((char*)dayEvents[curitem].title, needle) || \
       NULL != strcasestr((char*)dayEvents[curitem].location, needle) || \
@@ -574,9 +574,7 @@ int searchEventsOnDay(EventDate* date, const char* folder, SimpleCalendarEvent* 
    * if calEvents is NULL simply returns the number of results
    * returns the search results count
    */
-  int daynumevents = getEvents(date, folder, NULL); // get event count
-  if(daynumevents==0) return 0;
-  return SearchHelper(date, calEvents, daynumevents, folder, needle, limit);
+  return SearchHelper(date, calEvents, folder, needle, limit);
 }
 
 int searchEventsOnYearOrMonth(int y, int m, const char* folder, SimpleCalendarEvent* calEvents,
@@ -632,9 +630,10 @@ int searchEventsOnYearOrMonth(int y, int m, const char* folder, SimpleCalendarEv
         
         // see if the date in the filename is valid
         if(isDateValid(thisday.year,thisday.month,thisday.day)) {
-          int daynumevents = getEvents(&thisday, folder, NULL); // get event count
-          if(daynumevents > 0) {
-            index += SearchHelper(&thisday, calEvents+index, daynumevents, folder, needle, limit);
+          SimpleCalendarEvent* output = calEvents == NULL ? NULL : calEvents + index;
+          int matches = SearchHelper(&thisday, output, folder, needle, limit - index);
+          if(matches > 0) {
+            index += matches;
             if(index >= limit) {
               Bfile_FindClose(findhandle);
               return index;
