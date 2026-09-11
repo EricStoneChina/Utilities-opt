@@ -10,7 +10,10 @@
  * #define  SRV1_UNIX_HOST
  * #define  UMON_HOST
  */
+
+#ifndef UNIX_HOST
 #define PRIZM_HOST
+#endif
 
 #define LARGE_INT_POWER_OF_TEN 1000000000   /* the largest power of ten which fits in an int on this architecture */
 #if defined(__hppa__) || defined(__sparc__)
@@ -31,7 +34,7 @@
 #define INTERACTIVE_PROMPT_STATEMENT "picoc> "
 #define INTERACTIVE_PROMPT_LINE "     > "
 
-#if 0
+#if defined(UNIX_HOST)
 /* host platform includes */
 #ifdef UNIX_HOST
 # define USE_MALLOC_STACK                   /* stack is allocated using malloc() */

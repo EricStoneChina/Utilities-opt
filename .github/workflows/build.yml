@@ -63,3 +63,15 @@ jobs:
           path: |
             *.g3a
             *.bin
+
+  picoc-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/picoc
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Run PicoC host regression tests
+        run: make test

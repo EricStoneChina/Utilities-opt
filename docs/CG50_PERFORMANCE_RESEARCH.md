@@ -136,4 +136,5 @@ PicoC 的 Unix 测试 Makefile 还引用仓库中缺失的 `platform/platform_un
 - 已完成第十项周视图 I/O 优化：读取周视图时直接把每一天的简化事件写入共享缓冲区，移除“先统计、再重新读取填充”的重复文件扫描；周视图日历文件读取次数由两遍降为一遍。当前 `.bin` 为 149,548 bytes，`.g3a` 为 178,224 bytes，静态 `alloca` 仍为 0，交叉编译通过。
 - 已修复 Windows `Makefile clean`：改为使用 PowerShell 字面路径清理生成目录和产物；随后完成一次从零开始的清洁交叉编译，静态 `alloca` 仍为 0。
 - 已将性能静态审计接入 GitHub Actions：每次构建都会发布审计摘要、执行 `git diff --check`，并在重新引入 `alloca` 时失败；本机缺少宿主 GCC/Make，因此 PicoC 原有 PC 测试仍待 CI 环境补跑。
+- 已恢复 PicoC 的 `UNIX_HOST` 主机入口和缺失的平台适配文件，并新增 Ubuntu GitHub Actions 回归测试 job；本机缺少宿主 GCC/Make，因此尚未在本地执行这些测试。
 - 尚未在 CG50/官方模拟器上运行；因此当前是“可重复构建 + 静态审计”，还不是最终的实机性能结论。

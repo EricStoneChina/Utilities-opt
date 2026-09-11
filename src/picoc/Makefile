@@ -1,6 +1,7 @@
 CC=gcc
-CFLAGS=-Wall -pedantic -g -DUNIX_HOST
-LIBS=-lm -lreadline
+USE_READLINE ?= 0
+CFLAGS=-Wall -pedantic -g -DUNIX_HOST $(if $(filter 1 yes true,$(USE_READLINE)),-DUSE_READLINE,)
+LIBS=-lm $(if $(filter 1 yes true,$(USE_READLINE)),-lreadline,)
 
 TARGET	= picoc
 SRCS	= picoc.c table.c lex.c parse.c expression.c heap.c type.c \
@@ -17,7 +18,7 @@ $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS) $(LIBS)
 
 test:	all
-	(cd tests; make test)
+	$(MAKE) -C tests test
 
 clean:
 	rm -f $(TARGET) $(OBJS) *~

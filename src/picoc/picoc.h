@@ -1,7 +1,9 @@
 #ifndef PICOC_H
 #define PICOC_H
 
+#ifndef UNIX_HOST
 #define PRIZM_HOST
+#endif
 
 /* picoc version number */
 #define PICOC_VERSION "v2.1"
