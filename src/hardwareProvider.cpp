@@ -43,11 +43,13 @@ int getHardwareModel() {
    * Returns 0 on unknown/inconclusive model, 1 on fx-CG 10, 2 on fx-CG 20,
    * and 3 on fx-CG 50 (including the AU hardware variant).
    */
-  char* byte1 = (char*)0x80000303;
-  char* byte2 = (char*)0x80000305;
-  if((*byte1 == '\x41') && (*byte2 == '\x5A')) return 1;
-  if((*byte1 == '\x44') && (*byte2 == '\xAA')) return 2;
-  if((*byte1 == '\x41') && (*byte2 == '\xAA')) return 3;
+  const volatile unsigned char* byte1 = (const volatile unsigned char*)0x80000303;
+  const volatile unsigned char* byte2 = (const volatile unsigned char*)0x80000305;
+  const unsigned char modelByte1 = *byte1;
+  const unsigned char modelByte2 = *byte2;
+  if((modelByte1 == 0x41) && (modelByte2 == 0x5A)) return 1;
+  if((modelByte1 == 0x44) && (modelByte2 == 0xAA)) return 2;
+  if((modelByte1 == 0x41) && (modelByte2 == 0xAA)) return 3;
   return 0;
 }
 
