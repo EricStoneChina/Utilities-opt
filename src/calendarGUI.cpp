@@ -684,11 +684,21 @@ int viewEventsChild(Menu* menu, int y, int m, int d) {
   //returns 0 if the idea really is to exit the screen
   EventDate thisday;
   thisday.day = d; thisday.month = m; thisday.year = y;  
+  CalendarEvent* events = NULL;
+  MenuItem* menuitems = NULL;
+  int result = 1;
   
   menu->numitems = getEvents(&thisday, CALENDARFOLDER, NULL); // get event count only, to know how
                                                               // much memory to alloc
-  CalendarEvent* events = (CalendarEvent*)alloca(menu->numitems*sizeof(CalendarEvent));
-  MenuItem* menuitems = (MenuItem*)alloca(menu->numitems*sizeof(MenuItem));
+  if(menu->numitems > 0) {
+    events = (CalendarEvent*)malloc(menu->numitems*sizeof(CalendarEvent));
+    menuitems = (MenuItem*)malloc(menu->numitems*sizeof(MenuItem));
+    if(events == NULL || menuitems == NULL) {
+      free(menuitems);
+      free(events);
+      return 0;
+    }
+  }
   menu->numitems = getEvents(&thisday, CALENDARFOLDER, events);
   int curitem = 0;
   while(curitem < menu->numitems) {
@@ -737,16 +747,18 @@ int viewEventsChild(Menu* menu, int y, int m, int d) {
     int res = doMenu(menu);
     switch(res) {
       case MENU_RETURN_EXIT:
-        return 0;
+        result = 0;
+        goto cleanup;
         break;
       case KEY_CTRL_F1:
         if(menu->fkeypage == 0 && menu->numitems > 0)
           viewEvent(&events[menu->selection-1]);
         else if (menu->fkeypage == 1 &&
-                 moveEventScreen(events, menu->numitems, menu->selection-1, 1) ==
+          moveEventScreen(events, menu->numitems, menu->selection-1, 1) ==
                  EVENTEDITOR_RETURN_CONFIRM) {
           bufmonth = 0; searchValid = 0;
-          return 1;
+          result = 1;
+          goto cleanup;
         }
         break;
       case MENU_RETURN_SELECTION:
@@ -758,14 +770,15 @@ int viewEventsChild(Menu* menu, int y, int m, int d) {
             AUX_DisplayErrorMessage( 0x2E );
           } else {
             if(EVENTEDITOR_RETURN_CONFIRM == eventEditor(y, m, d)) {
-              bufmonth=0; searchValid = 0; return 1;
+              bufmonth=0; searchValid = 0; result = 1; goto cleanup;
             }
           }
         } else if (menu->fkeypage == 1) {
           if(moveEventScreen(events, menu->numitems, menu->selection-1) ==
               EVENTEDITOR_RETURN_CONFIRM) {
             bufmonth=0; searchValid = 0;
-            return 1;
+            result = 1;
+            goto cleanup;
           }
         }
         break;
@@ -777,7 +790,8 @@ int viewEventsChild(Menu* menu, int y, int m, int d) {
               replaceEventFile(&events[menu->selection-1].startdate, events, CALENDARFOLDER, menu->numitems);
               searchValid = 0; bufmonth = 0;
             }
-            return 1; // even if the user didn't confirm the changes, we have them in our event list
+            result = 1;
+            goto cleanup; // even if the user didn't confirm the changes, reload the list
                       // discard the changes by reloading the list to a clean state.
           }
         } else if (menu->fkeypage == 1) {
@@ -795,7 +809,7 @@ int viewEventsChild(Menu* menu, int y, int m, int d) {
                 deleteAllEventsPrompt(y, m, d, 0)
               )
             ) {
-            bufmonth = 0; searchValid = 0; return 1;
+            bufmonth = 0; searchValid = 0; result = 1; goto cleanup;
           }
         }
         break;
@@ -805,7 +819,8 @@ int viewEventsChild(Menu* menu, int y, int m, int d) {
            deleteEventPrompt(events, menu->numitems, menu->selection-1)) {
           bufmonth = 0;
           searchValid = 0;
-          return 1;
+          result = 1;
+          goto cleanup;
         }
         break;
       case KEY_CTRL_F6:
@@ -819,12 +834,16 @@ int viewEventsChild(Menu* menu, int y, int m, int d) {
           replaceEventFile(&events[menu->selection-1].startdate, events,
                            CALENDARFOLDER, menu->numitems);
           searchValid = 0;
-          return 1;
+           result = 1;
+           goto cleanup;
         }
         break;
     }
   }
-  return 1;
+cleanup:
+  free(menuitems);
+  free(events);
+  return result;
 }
 
 void viewEvent(CalendarEvent* event) {

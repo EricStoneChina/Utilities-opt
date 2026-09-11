@@ -538,7 +538,9 @@ int SearchHelper(EventDate* date, SimpleCalendarEvent* calEvents, int daynumeven
                  const char* folder, char* needle, int limit) {
   // limit is the maximum number of results
   int index = 0;
-  CalendarEvent* dayEvents = (CalendarEvent*)alloca(daynumevents*sizeof(CalendarEvent));
+  if(daynumevents <= 0) return 0;
+  CalendarEvent* dayEvents = (CalendarEvent*)malloc(daynumevents*sizeof(CalendarEvent));
+  if(dayEvents == NULL) return 0;
   daynumevents = getEvents(date, folder, dayEvents);
   for(int curitem = 0; curitem < daynumevents; curitem++) {
     if(NULL != strcasestr((char*)dayEvents[curitem].title, needle) || \
@@ -554,9 +556,13 @@ int SearchHelper(EventDate* date, SimpleCalendarEvent* calEvents, int daynumeven
         calEvents[index].origpos = curitem;
       }
       index++;
-      if(index >= limit) return index;
+      if(index >= limit) {
+        free(dayEvents);
+        return index;
+      }
     }
   }
+  free(dayEvents);
   return index;
 }
 
