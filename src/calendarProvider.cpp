@@ -409,6 +409,10 @@ int getEvents(EventDate* startdate, const char* folder, CalendarEvent* calEvents
   {
     // Returned no error, file exists and is open
     int size = Bfile_GetFileSize_OS(hFile);
+    if(size < 0) {
+      Bfile_CloseFile_OS(hFile);
+      return 0;
+    }
     // File exists and has size 'size'
     // Read file into a buffer which is then parsed and broke in multiple event strings.
     // These event strings are then turned into a CalendarEvent.
@@ -418,7 +422,7 @@ int getEvents(EventDate* startdate, const char* folder, CalendarEvent* calEvents
       setDBcorruptFlag(1);
       return -1;
     }
-    char* asrc = (char*)malloc((MAX_EVENT_FILESIZE + 1) * sizeof(char));
+    char* asrc = (char*)malloc((size_t)size + 1);
     if(asrc == NULL) {
       Bfile_CloseFile_OS(hFile);
       return 0;
@@ -691,7 +695,7 @@ void repairEventFile(char* name, const char* folder, int* checkedevents, int* pr
     *problemsfound = *problemsfound + 1;
     return;
   }
-  unsigned char* asrc = (unsigned char*)malloc((MAX_EVENT_FILESIZE + 1) * sizeof(unsigned char));
+  unsigned char* asrc = (unsigned char*)malloc((size_t)size + 1);
   if(asrc == NULL) {
     Bfile_CloseFile_OS(hFile);
     return;
