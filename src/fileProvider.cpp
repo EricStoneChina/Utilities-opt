@@ -179,19 +179,24 @@ int searchForFiles(File* files, const char* basepath, const char* needle, int se
           int hFile = Bfile_OpenFile_OS(pFile, READ, 0); // Get handle
           if(hFile >= 0) // Check if it opened
           { //opened
-            unsigned char buf[1030] = ""; // initialize to zeros, and make sure it is a bit bigger
-            // than the amount of bytes we're going to read, so that the string is always
-            // null-terminated and can be safely passed to the string compare function.
+            unsigned char buf[1074];
+            int readsize = Bfile_ReadFile_OS(hFile, buf, 1024, -1);
             while(1) {
-              int readsize = Bfile_ReadFile_OS(hFile, buf, 1024, -1);
+              if(readsize <= 0) break;
               if(NULL != memmem((char*)buf, readsize, needle, nlen, matchCase)) {
                 match = 1;
                 break;
               }
               if(readsize < 100) break;
-              Bfile_SeekFile_OS(hFile, Bfile_TellFile_OS(hFile)-50); // rewind 50 bytes, to make
-              // sure we didn't miss the needle (max. 50 bytes) which may be located between the end
-              // of a read section and the start of another.
+              // Preserve the overlap in memory instead of seeking back 50
+              // bytes for every block. This keeps cross-block matches while
+              // avoiding two extra file-system calls per block.
+              int overlap = readsize < 50 ? readsize : 50;
+              memmove(buf, buf + readsize - overlap, overlap);
+              int nextsize = Bfile_ReadFile_OS(hFile, buf + overlap,
+                                               1024 - overlap, -1);
+              if(nextsize < 0) break;
+              readsize = overlap + nextsize;
             }
             Bfile_CloseFile_OS(hFile);
           }
