@@ -338,7 +338,11 @@ int viewWeekCalendarChild(Menu* menu, int* y, int* m, int* d, int* jumpToSel, in
    
   unsigned int curday = 0; unsigned int numevents = 0;
   unsigned int fevcount[7];
-  // get event count only, so we know how many SimpleCalendarEvents to alloc
+  const unsigned int maxWeekEvents = 7 * MAX_DAY_EVENTS_WEEKVIEW;
+  events = (SimpleCalendarEvent*)malloc(maxWeekEvents*sizeof(SimpleCalendarEvent));
+  if(events == NULL) return 0;
+  unsigned int cursce = 0;
+  // Read each day once, directly populating the week event buffer.
   while(curday < 7) {
     long int ny, nm, nd;
     daysToDate(ddays, &ny, &nm, &nd);
@@ -350,21 +354,22 @@ int viewWeekCalendarChild(Menu* menu, int* y, int* m, int* d, int* jumpToSel, in
       *y = LOWEST_SUPPORTED_YEAR-1;
       return 1;
     }
-    fevcount[curday] = getEvents(&date, CALENDARFOLDER, NULL, MAX_DAY_EVENTS_WEEKVIEW);
+    int dayEvents = getEvents(&date, CALENDARFOLDER, NULL, MAX_DAY_EVENTS_WEEKVIEW,
+                              events+cursce);
+    if(dayEvents < 0) return 1;
+    fevcount[curday] = dayEvents;
     numevents += fevcount[curday];
+    cursce += fevcount[curday];
     ddays++;
     curday++;
   }
-  // allocate SimpleCalendarEvents
-  events = numevents > 0 ?
-    (SimpleCalendarEvent*)malloc(numevents*sizeof(SimpleCalendarEvent)) : NULL;
   // allocate MenuItems:
   menuitems = (MenuItem*)malloc((numevents+7)*sizeof(MenuItem));
   if((numevents > 0 && events == NULL) || menuitems == NULL) return 0;
   
   // read events this time, populating menu at the same time
   unsigned int curmenu = 0;
-  unsigned int cursce = 0; // SimpleCalendarEvent index, will have their count
+  cursce = 0; // SimpleCalendarEvent index, will have their count
   ddays=dateToDays(*y, *m, *d);
   char menuitemtext[7][42];
   for(curday=0; curday < 7; curday++) {
@@ -400,10 +405,6 @@ int viewWeekCalendarChild(Menu* menu, int* y, int* m, int* d, int* jumpToSel, in
     if(ny==oy&&nm==om&&nd==od&&*jumpToSel==1) menu->selection=curmenu+1;
     curmenu++;
     if(fevcount[curday]) {
-      EventDate date;
-      date.year=ny; date.month=nm; date.day=nd;
-      // read directly into SimpleCalendarEvents
-      getEvents(&date, CALENDARFOLDER, NULL, MAX_DAY_EVENTS_WEEKVIEW, events+cursce);
       for(unsigned int k = 0; k < fevcount[curday]; k++) {
         // build menuitem
         menuitems[curmenu].text = (char*)events[cursce].title;
