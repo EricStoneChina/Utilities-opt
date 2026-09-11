@@ -37,20 +37,18 @@ int viewTasksChild(Menu* menu) {
   //returns 1 when it wants to be restarted (refresh tasks)
   //returns 0 if the idea really is to exit the screen
   EventDate taskday;
-  
-  menu->numitems = getEvents(&taskday, CALENDARFOLDER, NULL); // get event count
-  CalendarEvent* tasks = menu->numitems > 0 ?
-    (CalendarEvent*)malloc(menu->numitems*sizeof(CalendarEvent)) : NULL;
-  MenuItem* menuitems = menu->numitems > 0 ?
-    (MenuItem*)malloc(menu->numitems*sizeof(MenuItem)) : NULL;
-  if(menu->numitems > 0 && (tasks == NULL || menuitems == NULL)) {
+
+  CalendarEvent* tasks = (CalendarEvent*)malloc(MAX_DAY_EVENTS*sizeof(CalendarEvent));
+  MenuItem* menuitems = (MenuItem*)malloc(MAX_DAY_EVENTS*sizeof(MenuItem));
+  if(tasks == NULL || menuitems == NULL) {
     free(tasks);
     free(menuitems);
     menu->numitems = 0;
     menu->items = NULL;
     return 0;
   }
-  menu->numitems = getEvents(&taskday, CALENDARFOLDER, tasks);
+  // Tasks use the zero date and share the same single-file event limit.
+  menu->numitems = getEvents(&taskday, CALENDARFOLDER, tasks, MAX_DAY_EVENTS);
   int activecount = 0;
   for(int curitem = 0; curitem < menu->numitems; curitem++) {
     menuitems[curitem].text = (char*)tasks[curitem].title;

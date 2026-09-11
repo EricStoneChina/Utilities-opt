@@ -709,22 +709,18 @@ int viewEventsChild(Menu* menu, int y, int m, int d) {
   //returns 0 if the idea really is to exit the screen
   EventDate thisday;
   thisday.day = d; thisday.month = m; thisday.year = y;  
-  CalendarEvent* events = NULL;
-  MenuItem* menuitems = NULL;
+  CalendarEvent* events = (CalendarEvent*)malloc(MAX_DAY_EVENTS*sizeof(CalendarEvent));
+  MenuItem* menuitems = (MenuItem*)malloc(MAX_DAY_EVENTS*sizeof(MenuItem));
   int result = 1;
-  
-  menu->numitems = getEvents(&thisday, CALENDARFOLDER, NULL); // get event count only, to know how
-                                                              // much memory to alloc
-  if(menu->numitems > 0) {
-    events = (CalendarEvent*)malloc(menu->numitems*sizeof(CalendarEvent));
-    menuitems = (MenuItem*)malloc(menu->numitems*sizeof(MenuItem));
-    if(events == NULL || menuitems == NULL) {
-      free(menuitems);
-      free(events);
-      return 0;
-    }
+
+  if(events == NULL || menuitems == NULL) {
+    free(menuitems);
+    free(events);
+    return 0;
   }
-  menu->numitems = getEvents(&thisday, CALENDARFOLDER, events);
+  // The single-day limit is also the storage format's maximum. Read once and
+  // populate the menu directly instead of counting with a second file scan.
+  menu->numitems = getEvents(&thisday, CALENDARFOLDER, events, MAX_DAY_EVENTS);
   int curitem = 0;
   while(curitem < menu->numitems) {
     menuitems[curitem].text = (char*)events[curitem].title;
