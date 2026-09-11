@@ -15,7 +15,7 @@
 - 上游基线：`v2.1`，commit `e1b64f607b28f6932f639d575d0d3fc667d87a54`。
 - 本地分支：`codex/optimization`。
 - 初始源码统计（上游快照）：约 31,114 行，38 个 C++ 文件，81 个 C 文件；包含 PicoC 测试和第三方组件。
-- 当前统计以 `tools/perf-audit.ps1` 的实际输出为准；最近一次审计为 173 个源码文件、34,932 行，`alloca` 为 0，`Bfile_*` 为 306，`MCS*` 为 36，`Bdisp_AllClr_VRAM` 为 34，`Bdisp_PutDisp_DD` 为 18。
+- 当前统计以 `tools/perf-audit.ps1` 的实际输出为准；最近一次审计约为 173 个源码文件、34.9k 行，`alloca` 为 0，`Bfile_*` 为 306，`MCS*` 为 36，`Bdisp_AllClr_VRAM` 为 34，`Bdisp_PutDisp_DD` 为 18。
 - 可重复审计入口：`tools/perf-audit.ps1`。它只读取源码，输出当前 revision、源码规模、高风险调用计数和所有 `alloca` 位置。
 
 这些数字是源码扫描结果，不等同于运行时热点；运行时热点必须由 CG50 或兼容模拟环境中的计时数据确认。
