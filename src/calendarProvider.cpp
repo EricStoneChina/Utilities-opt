@@ -20,6 +20,12 @@
 #include "stringsProvider.hpp"
 #include "fileProvider.hpp" 
 
+struct CalendarFileBufferGuard {
+  char* buffer;
+  explicit CalendarFileBufferGuard(char* buffer_) : buffer(buffer_) {}
+  ~CalendarFileBufferGuard() { free(buffer); }
+};
+
 char* eventToString(CalendarEvent* calEvent, char* buf) {
   /* Parses a CalendarEvent struct and turns it into a string which can be written to a file.
    * The resulting string is appended to the end of buf.
@@ -322,9 +328,14 @@ int replaceEventFile(EventDate *startdate, CalendarEvent* newEvents,
    * (including the edited one).
    * count: number of events in newEvents (number of events in old file doesn't matter). one-based.
    */
-  // convert the calevents back to char.
-  // assumes each event, as string, doesn't take more than 1250 bytes
-  char newfilecontents[7+count*1250];
+  // Convert the calendar events back to text. Each event is limited to 1250
+  // bytes by the storage format, so allocate the worst-case file buffer on
+  // the heap instead of creating a count-sized VLA on the CG50 stack.
+  if(count < 0 || count > MAX_DAY_EVENTS) return 1;
+  size_t bufferSize = sizeof(FILE_HEADER) - 1 + (size_t)count * 1250;
+  char* newfilecontents = (char*)malloc(bufferSize);
+  CalendarFileBufferGuard bufferGuard(newfilecontents);
+  if(newfilecontents == NULL) return 1;
   strcpy(newfilecontents, (char*)FILE_HEADER);
   char* contentptr = newfilecontents + sizeof(FILE_HEADER) - 1;
   for(int j = 0; j < count; j++) {
