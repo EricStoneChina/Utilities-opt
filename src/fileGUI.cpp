@@ -991,18 +991,14 @@ void viewFileAsText(char* filename) {
       return;
     }
     if(filesize > MAX_TEXTVIEWER_FILESIZE) filesize = MAX_TEXTVIEWER_FILESIZE;
-    // check if there's enough stack to proceed:
-    if(0x881E0000 - (int)GetStackPtr() < 500000 - filesize*sizeof(unsigned char) - 30000) {
-      asrc = (unsigned char*)alloca(filesize*sizeof(unsigned char)+5);
-      Bfile_ReadFile_OS(hFile, asrc, filesize, 0);
-      Bfile_CloseFile_OS(hFile);
-      asrc[filesize] = '\0';
-    } else {
-      // there's not enough stack to put the file in RAM, so just return.
-      // this can happen when opening a file from the search results
+    asrc = (unsigned char*)malloc(filesize + 1);
+    if(asrc == NULL) {
       Bfile_CloseFile_OS(hFile);
       return;
     }
+    Bfile_ReadFile_OS(hFile, asrc, filesize, 0);
+    Bfile_CloseFile_OS(hFile);
+    asrc[filesize] = '\0';
   } else {
     //Error opening file, abort
     AUX_DisplayErrorMessage(0x2B); // Data ERROR
@@ -1048,6 +1044,7 @@ void viewFileAsText(char* filename) {
     bcur += jump;
   }
   doTextArea(&text);
+  free(asrc);
 }
 
 void viewClipboard(File* clipboard, int* itemsinclip) {
