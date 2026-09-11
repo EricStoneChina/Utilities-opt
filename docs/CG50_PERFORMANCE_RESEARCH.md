@@ -35,7 +35,7 @@
 
 ### 1. 硬件模型识别过时
 
-`src/hardwareProvider.cpp` 的 `getHardwareModel()` 只识别 fx-CG10 和 fx-CG20，否则返回 `0`。CG50 的产品型号编码不同，因此系统信息页会显示 `Unknown`，其他未来依赖模型判断的逻辑也可能失效。
+`src/hardwareProvider.cpp` 原先的 `getHardwareModel()` 只识别 fx-CG10 和 fx-CG20；本地分支现已加入 CG50/AU 使用的 `0x41/0xAA` 组合，并在系统信息页显示 `fx-CG 50`。AU 的存储容量差异仍需单独用实机数据确认。
 
 ### 2. 直接内存地址访问
 
@@ -154,5 +154,6 @@ PicoC 的 Unix 测试入口已恢复为可选 readline 的主机测试，并由 
 - 已将性能静态审计接入 GitHub Actions：每次构建都会发布审计摘要、执行 `git diff --check`，并在重新引入 `alloca` 时失败；本机缺少宿主 GCC/Make，因此 PicoC 原有 PC 测试仍待 CI 环境补跑。
 - 已恢复 PicoC 的 `UNIX_HOST` 主机入口和缺失的平台适配文件，并新增 Ubuntu GitHub Actions 回归测试 job；本机缺少宿主 GCC/Make，因此尚未在本地执行这些测试。
 - 纯读取的事件文件修复流程已改用 SDK 的 `READ` 模式打开，避免无必要的读写句柄。
+- 已补上 CG50/AU 硬件型号识别，并缓存一次识别结果，避免系统信息页面重复读取裸地址。
 - 本轮最新提交后，本机没有可用的交叉编译器/Make；仓库中的 `.bin`/`.g3a` 是此前构建留下的忽略产物，不能作为最新提交的构建证明。应以 GitHub Actions 的构建与测试结果为准。
 - 尚未在 CG50/官方模拟器上运行；因此当前是“可重复构建 + 静态审计”，还不是最终的实机性能结论。

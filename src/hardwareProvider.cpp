@@ -40,12 +40,14 @@ int getHardwareModel() {
   /* Returns calculator model. There is a syscall for this, but with this we know exactly what we
    * are checking. Not to be confused with the "PCB model", which on the Prizm series appears to be
    * always 755D for CG 20 or 755A for CG 10.
-   * Returns 0 on unknown/inconclusive model, 1 on fx-CG 10 and 2 on fx-CG 20
+   * Returns 0 on unknown/inconclusive model, 1 on fx-CG 10, 2 on fx-CG 20,
+   * and 3 on fx-CG 50 (including the AU hardware variant).
    */
   char* byte1 = (char*)0x80000303;
   char* byte2 = (char*)0x80000305;
   if((*byte1 == '\x41') && (*byte2 == '\x5A')) return 1;
   if((*byte1 == '\x44') && (*byte2 == '\xAA')) return 2;
+  if((*byte1 == '\x41') && (*byte2 == '\xAA')) return 3;
   return 0;
 }
 

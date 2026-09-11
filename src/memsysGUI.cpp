@@ -320,10 +320,13 @@ void systemInfo() {
   elem[8].newLine = 1;
   elem[8].text = (char*)"Calculator model:";
   elem[8].spaceAtEnd=1;
-  if(getHardwareModel() == 1) {
+  int hardwareModel = getHardwareModel();
+  if(hardwareModel == 1) {
     elem[9].text = (char*)"fx-CG 10";
-  } else if(getHardwareModel() == 2) {
+  } else if(hardwareModel == 2) {
     elem[9].text = (char*)"fx-CG 20";
+  } else if(hardwareModel == 3) {
+    elem[9].text = (char*)"fx-CG 50";
   } else {
     elem[9].text = (char*)"Unknown";
   }
