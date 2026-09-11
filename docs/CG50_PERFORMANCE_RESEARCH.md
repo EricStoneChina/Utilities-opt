@@ -147,6 +147,7 @@ PicoC 的 Unix 测试 Makefile 还引用仓库中缺失的 `platform/platform_un
 - `replaceEventFile()` 中按事件数量增长、最大约 125 KiB 的 VLA 已移到堆，并加入事件数量边界检查；剩余大缓冲区不再叠加到 CG50 调用栈。
 - 文本文件查看器最多 2,000 项的 `textElement` VLA 已移到堆，并修正文件大小错误返回的无符号转换风险。
 - `userInfo()` 固定的 10,240 项 `textElement` 栈数组已移到堆，避免历史注册信息页面产生百 KiB 级栈峰值。
+- 静态审计已增加大型栈数组/VLA 候选报告，覆盖 4 KiB 以上数组及 `TEXT_BUFFER_SIZE`、`MAX_EVENT_FILESIZE`、`numelements`、`count*` 等容量表达式。
 - 已修复 Windows `Makefile clean`：改为使用 PowerShell 字面路径清理生成目录和产物；随后完成一次从零开始的清洁交叉编译，静态 `alloca` 仍为 0。
 - 已将性能静态审计接入 GitHub Actions：每次构建都会发布审计摘要、执行 `git diff --check`，并在重新引入 `alloca` 时失败；本机缺少宿主 GCC/Make，因此 PicoC 原有 PC 测试仍待 CI 环境补跑。
 - 已恢复 PicoC 的 `UNIX_HOST` 主机入口和缺失的平台适配文件，并新增 Ubuntu GitHub Actions 回归测试 job；本机缺少宿主 GCC/Make，因此尚未在本地执行这些测试。

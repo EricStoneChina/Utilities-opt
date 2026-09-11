@@ -47,6 +47,19 @@ $keyCount = Get-MatchCount '\b(GetKey|GetKeyWait_OS)\s*\('
 $sprintfCount = Get-MatchCount '\bsprintf\s*\('
 $strcpyCount = Get-MatchCount '\bstrcpy\s*\('
 $strcatCount = Get-MatchCount '\bstrcat\s*\('
+$largeStackPattern = '\b(?:char|unsigned\s+char|unsigned\s+short|short|int|long|textElement|MenuItem|CalendarEvent|SimpleCalendarEvent|AddIn|Transaction|totp)\s+[A-Za-z_][A-Za-z0-9_]*\s*\[[^\]]*(?:[0-9]{4,}|TEXT_BUFFER_SIZE|MAX_EVENT_FILESIZE|numelements|count\s*\*)[^\]]*\]'
+$largeStackArrays = @(
+  foreach ($file in $sourceFiles) {
+    Select-String -LiteralPath $file.FullName -Pattern $largeStackPattern |
+      ForEach-Object {
+        [pscustomobject]@{
+          Path = $file.FullName.Substring($RootPath.Length + 1)
+          Line = $_.LineNumber
+          Text = $_.Line.Trim()
+        }
+      }
+  }
+)
 
 Write-Output "# Utilities static performance audit"
 Write-Output ""
@@ -68,6 +81,7 @@ Write-Output "| GetKey/GetKeyWait | $keyCount |"
 Write-Output "| sprintf | $sprintfCount |"
 Write-Output "| strcpy | $strcpyCount |"
 Write-Output "| strcat | $strcatCount |"
+Write-Output "| large stack array candidates | $($largeStackArrays.Count) |"
 
 Write-Output ""
 Write-Output "## Largest source files"
@@ -87,5 +101,16 @@ foreach ($file in $sourceFiles) {
     $relativePath = $file.FullName.Substring($RootPath.Length + 1)
     $lineNumbers = ($allocaMatches | ForEach-Object { $_.LineNumber }) -join ", "
     Write-Output "- ``$relativePath``: lines $lineNumbers"
+  }
+}
+
+Write-Output ""
+Write-Output "## Large stack array candidates"
+Write-Output ""
+if ($largeStackArrays.Count -eq 0) {
+  Write-Output "- none detected"
+} else {
+  foreach ($item in $largeStackArrays) {
+    Write-Output "- ``$($item.Path):$($item.Line)``: $($item.Text)"
   }
 }
