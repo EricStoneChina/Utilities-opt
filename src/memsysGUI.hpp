@@ -30,6 +30,7 @@ typedef struct
 } AddIn;
 
 void memoryCapacityScreen(int isPaneOffset=0);
+void deviceDashboard();
 int getAddins(AddIn addins[]);
 void addinManager();
 int addinManagerChild(Menu* menu);

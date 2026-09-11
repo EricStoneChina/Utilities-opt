@@ -26,4 +26,10 @@ int base32_decode(const unsigned char *encoded, unsigned char *result, int size)
 int base32_validate(const char* string);
 void itoa_zeropad(int n, char* buffer, int digits);
 
+// UI localization. Returned Chinese strings use the calculator's GB18030
+// byte encoding but do not include the PrintXY mode prefix.
+const char* localizeText(const char* text);
+int isChineseLanguage();
+int isChineseText(const char* text);
+
 #endif

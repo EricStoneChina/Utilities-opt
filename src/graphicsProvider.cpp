@@ -195,55 +195,28 @@ void CopySpriteNbitMasked(const unsigned char* data, int x, int y, int width, in
   }
 }
 
-// the following function will draw a variation of the Segvault logo,
-// starting at screen coordinates x,y
+// Draw the Utilities logo in the visual language of the fx-CG 50: a dark
+// calculator-style badge with blue/cyan accents. The function name is kept
+// for PicoC/source compatibility with the original Utilities API.
 // w: 101
 // h: 44
-static const unsigned char logoLines[]={
-  // S, E, G:
-  0, 10, 10, 0,
-  1, 11, 10, 20,
-  0, 30, 9, 21,
-  14, 10, 24, 0,
-  15, 11, 24, 20,
-  14, 11, 14, 20,
-  15, 21, 24, 30,
-  28, 10, 38, 0,
-  28, 11, 28, 20,
-  29, 21, 38, 30,
-  38, 29, 38, 20,
-  37, 19, 34, 16,
-  // V:
-  42, 0, 47, 30,
-  52, 0, 47, 30,
-  // A, U, L, T:
-  52, 30, 57, 0,
-  62, 30, 57, 0,
-  66, 0, 66, 20,
-  67, 21, 76, 30,
-  76, 29, 76, 0,
-  80, 0, 80, 30,
-  81, 29, 90, 20,
-  94, 0, 94, 30,
-  89, 10, 99, 0
-};
-
 void drawSegvaultLogo(int x, int y) {
-  int i;
-  for(i = 0; i < 12*4; i += 4) {
-    drawLine(x+logoLines[i], y+logoLines[i+1], x+logoLines[i+2], y+logoLines[i+3], COLOR_BLACK);
-    drawLine(x+logoLines[i]+1, y+logoLines[i+1], x+logoLines[i+2]+1, y+logoLines[i+3], COLOR_BLACK);
-  }
-  for(; i < 14*4; i += 4) {
-    drawLine(x+logoLines[i], y+logoLines[i+1], x+logoLines[i+2], y+logoLines[i+3], 0x02BF);
-    drawLine(x+logoLines[i]+1, y+logoLines[i+1], x+logoLines[i+2]+1, y+logoLines[i+3], 0x02BF);
-  }
-  for(; i < 23*4; i += 4) {
-    drawLine(x+logoLines[i], y+logoLines[i+1], x+logoLines[i+2], y+logoLines[i+3], 0x04BF);
-    drawLine(x+logoLines[i]+1, y+logoLines[i+1], x+logoLines[i+2]+1, y+logoLines[i+3], 0x04BF);
-  }
-  int mx = x+16, my=y+35;
-  PrintMiniMini(&mx, &my, "BROAD LEAPS", 64, TEXT_COLOR_BLACK, 0);
+  drawRectangle(x, y, 101, 44, COLOR_NAVY);
+  drawLine(x, y, x+100, y, COLOR_BLUE);
+  drawLine(x, y+43, x+100, y+43, COLOR_BLUE);
+  drawLine(x, y, x, y+43, COLOR_BLUE);
+  drawLine(x+100, y, x+100, y+43, COLOR_BLUE);
+
+  // A compact U-shaped mark, echoing the CG50's blue/cyan industrial UI.
+  drawRectangle(x+6, y+7, 4, 25, COLOR_CYAN);
+  drawRectangle(x+19, y+7, 4, 25, COLOR_BLUE);
+  drawRectangle(x+10, y+28, 9, 4, COLOR_CYAN);
+  drawLine(x+8, y+6, x+21, y+6, COLOR_BLUE);
+
+  int mx = x+29, my=y+9;
+  PrintMiniMini(&mx, &my, "UTILITIES", 0, TEXT_COLOR_WHITE, 0);
+  mx = x+29; my = y+26;
+  PrintMiniMini(&mx, &my, "CG50 EDITION", 0, TEXT_COLOR_CYAN, 0);
 }
 
 static const color_t fullColorsForText[] =
@@ -284,10 +257,21 @@ void clearLine(int x, int y, color_t color) {
 }
 
 void mPrintXY(int x, int y,const char*msg, int mode, int color) {
-  char nmsg[50];
-  nmsg[0] = 0x20;
-  nmsg[1] = 0x20;
-  strncpy(nmsg+2, msg, 48);
+  char nmsg[70];
+  const char* localized = localizeText(msg);
+  int useChineseFont = isChineseLanguage() &&
+                       (localized != msg || isChineseText(localized));
+  if (useChineseFont) {
+    // 0x03 0xA8 switches PrintXY to the calculator's Chinese font.
+    nmsg[0] = 0x03;
+    nmsg[1] = 0xA8;
+    strncpy(nmsg+2, localized, sizeof(nmsg)-3);
+  } else {
+    nmsg[0] = 0x20;
+    nmsg[1] = 0x20;
+    strncpy(nmsg+2, localized, sizeof(nmsg)-3);
+  }
+  nmsg[sizeof(nmsg)-1] = 0;
   PrintXY(x, y, nmsg, mode, color );
 }
 

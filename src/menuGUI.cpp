@@ -54,12 +54,13 @@ int doMenu(Menu* menu, MenuItemIcon* icontable) {
           curitem++) { // print the menu item only when appropriate
         char menuitemarr[70];
         char* menuitem = menuitemarr;
+        const char* displayText = localizeText(menu->items[curitem].text);
         if(menu->type == MENUTYPE_MULTISELECT) {
           //allow for the folder and selection icons on MULTISELECT menus (e.g. file browser):
           strcpy(menuitem, "  ");
           menuitem += 2;
         }
-        menuitem += strncpy_retlen(menuitem, menu->items[curitem].text, 67);
+        menuitem += strncpy_retlen(menuitem, displayText, 67);
         if(menu->items[curitem].type != MENUITEM_SEPARATOR) {
           // make sure we have a string big enough to have background when item is selected:          
           // MB_ElementCount is used instead of strlen because multibyte chars count as two with
@@ -68,7 +69,7 @@ int doMenu(Menu* menu, MenuItemIcon* icontable) {
                                // if the menu has the full width,
                                // fill the half-character at the end of the screen:
                                (menu->width == 21 ? 1 : 0) -
-                               MB_ElementCount(menu->items[curitem].text) -
+                               MB_ElementCount((char*)displayText) -
                                (menu->type == MENUTYPE_MULTISELECT ? 2 : 0);
           for(int i = 0; i < fillerRequired; i++) {
             *menuitem = ' ';

@@ -32,10 +32,15 @@ void setSetting(const int setting, const unsigned char value, const int autosave
 // Routines for saving and loading settings
 int loadSettings() { // returns 0 on success, 1 if settings were reset (first run / incompatibility)
   int size;
+  int bytesToRead;
   MCSGetDlen2(DIRNAME, SETTINGSFILE, &size);
   if (size <= 16) goto resetSettings; // no settings file or incompatible, reset settings.
 
-  MCSGetData1(0, NUMBER_OF_SETTINGS+1, settings);
+  // Read only the bytes that are actually present. This also lets us migrate
+  // the previous settings format without reading past the old file.
+  memset(settings, 0, sizeof(settings));
+  bytesToRead = size < (int)sizeof(settings) ? size : (int)sizeof(settings);
+  MCSGetData1(0, bytesToRead, settings);
   // ^ +1 because NUMBER_OF_SETTINGS does not include the file version
 
   // detect if the current settings file version is compatible with the one we're expecting.
@@ -43,8 +48,18 @@ int loadSettings() { // returns 0 on success, 1 if settings were reset (first ru
   // earlier.
   // for these, the filesize happened to be equal or smaller than 16 (checked above).
   // if we got here, the file is a "modern" one, so check the version byte.
-  if (settings[0] != SETTINGSFILE_VERSION) goto resetSettings; // if incompatible, reset settings
-  return 0;
+  if (settings[0] == SETTINGSFILE_VERSION && size >= (int)sizeof(settings)) return 0;
+
+  // Version 15 is the last English-only format. Keep all old values and add
+  // the new language setting with the Chinese default requested by the fork.
+  if (settings[0] == SETTINGSFILE_VERSION - 1 && size >= NUMBER_OF_SETTINGS) {
+    settings[SETTING_LANGUAGE] = LANGUAGE_CHINESE;
+    settings[SETTING_SELF_FILEVERSION] = SETTINGSFILE_VERSION;
+    saveSettings();
+    return 0;
+  }
+
+  goto resetSettings; // incompatible format
 
   resetSettings:
   memset(settings+1, 0, (sizeof(settings)-1)*sizeof(unsigned char));
@@ -62,6 +77,7 @@ int loadSettings() { // returns 0 on success, 1 if settings were reset (first ru
   settings[SETTING_FILE_MANAGER_SORT] = 1;
   settings[SETTING_FILE_MANAGER_SEARCH] = 1;
   settings[SETTING_TIMEZONE] = 51;
+  settings[SETTING_LANGUAGE] = LANGUAGE_CHINESE;
   return 1;
 }
 

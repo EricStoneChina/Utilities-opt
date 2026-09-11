@@ -1,6 +1,8 @@
-# Utilities add-in for the Casio Prizm (fx-CG 10 and 20)
+# Utilities-opt add-in for the Casio Prizm (fx-CG 50)
 
 The Utilities add-in enhances your Casio Prizm calculator by providing functionality not originally found in the OS, or by providing enhanced alternatives to existing functionality.
+
+This fork is tuned for the fx-CG 50 and continues to support the original data formats. It adds a Chinese/English interface switch, a CG50-styled startup logo, and a device dashboard for quickly checking the calculator's model, free storage, main memory, battery voltage, and whether it is running on real hardware.
 
 ## Features
 
@@ -31,6 +33,8 @@ The Utilities add-in enhances your Casio Prizm calculator by providing functiona
   - **Lantern** - turn your Prizm into a expensive lantern! Modes supported: steady light, flashing light, morse light (screen lightens up while you press a key) and color light.
   
   - **Memory usage viewer** - graphic display of the memory usage (main and storage) of the calculator.
+
+  - **Device dashboard** - a compact health view for the fx-CG 50, showing model, storage and main-memory headroom, battery voltage, and emulator status.
   
   - **Function key color adjuster** - change the color of the function key labels throughout the OS.
   
@@ -47,6 +51,8 @@ The Utilities add-in enhances your Casio Prizm calculator by providing functiona
   - Save the current time to the alpha/Basic variable T. This is useful for doing calculations around a certain time. Press the XoT key on the home screen to call the functionality.
   
   - Many settings to customize the behavior and looks of the add-in to your taste.
+
+  - **Chinese localization** - choose English or simplified Chinese from Settings > Language. Existing Utilities settings files are migrated automatically.
   
 ## And as a bonus...
 
@@ -61,7 +67,7 @@ If you use a version of Utilities older than Beta 9, please refer to "Old versio
 
 To install, connect the Prizm calculator to the computer with a miniUSB<->USB cable. On the calculator, press F1 when a pop-up appears on the screen. Wait for the USB connection to be established. When it's finished, your Prizm will appear on your computer as if it were a pendisk.
 
-Copy "utilities.g3a" to the root folder of the "pendisk" (i.e., out of any folders but inside the pendisk; if necessary, overwrite the existing file) and safely remove it. Wait for the calculator to finish "updating the Main Memory". When it does, you should notice a new Main Menu item, called "Utilities".
+Copy "Utilities-opt.g3a" to the root folder of the "pendisk" (i.e., out of any folders but inside the pendisk; if necessary, overwrite the existing file) and safely remove it. Wait for the calculator to finish "updating the Main Memory". When it does, you should notice a new Main Menu item, called "Utilities".
 
 The first time you run Utilities you'll be presented the Segvault logo and then a first run wizard with some important notes about the add-in, which you should read. You will then be told to adjust the clock, something you'll have to do every time you take the batteries off. Don't worry, Utilities will remind you to do it and guide you through the process.
   

@@ -57,7 +57,7 @@
 #endif
 
 #ifndef SELFFILE
-#define SELFFILE "utilities.g3a"
+#define SELFFILE "Utilities-opt.g3a"
 #endif
 
 #ifndef KNOWN_PAST_TIMESTAMP

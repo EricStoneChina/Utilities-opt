@@ -367,16 +367,17 @@ void toolsMenu(int* pane_keycache) {
 void memsysMenu(int* pane_keycache) {
   drawFkeyPopup(4, (char*)"Memory & System");
   
-  MenuItem menuitems[5];
-  menuitems[0].text = (char*)"File manager";
-  menuitems[1].text = (char*)"Memory usage";
-  menuitems[2].text = (char*)"Function key color";
-  menuitems[3].text = (char*)"System information";
-  menuitems[4].text = (char*)"Add-In manager";
+  MenuItem menuitems[6];
+  menuitems[0].text = (char*)"Device dashboard";
+  menuitems[1].text = (char*)"File manager";
+  menuitems[2].text = (char*)"Memory usage";
+  menuitems[3].text = (char*)"Function key color";
+  menuitems[4].text = (char*)"System information";
+  menuitems[5].text = (char*)"Add-In manager";
   
   Menu menu;
   menu.items=menuitems;
-  menu.numitems = 4 + !!getSetting(SETTING_SHOW_ADVANCED);
+  menu.numitems = 5 + !!getSetting(SETTING_SHOW_ADVANCED);
   menu.width=19;
   menu.height=4;
   menu.startX=2;
@@ -390,11 +391,12 @@ void memsysMenu(int* pane_keycache) {
       case MENU_RETURN_SELECTION:
         DrawFrame(COLOR_WHITE);
         switch(menu.selection) {
-          case 1: fileManager(); break;
-          case 2: memoryCapacityScreen(); break;
-          case 3: changeFKeyColor(); break;
-          case 4: systemInfo(); break;
-          case 5: addinManager(); break;
+          case 1: deviceDashboard(); break;
+          case 2: fileManager(); break;
+          case 3: memoryCapacityScreen(); break;
+          case 4: changeFKeyColor(); break;
+          case 5: systemInfo(); break;
+          case 6: addinManager(); break;
         }
         return;
       case KEY_CTRL_F6:

@@ -89,6 +89,55 @@ void memoryCapacityScreen(int isPaneOffset) {
   }
 }
 
+void deviceDashboard() {
+  Bdisp_AllClr_VRAM();
+  drawScreenTitle("Device dashboard");
+
+  const char* model = "Unknown";
+  switch(getHardwareModel()) {
+    case 1: model = "fx-CG 10"; break;
+    case 2: model = "fx-CG 20"; break;
+    case 3: model = "fx-CG 50"; break;
+  }
+
+  int storageFree = 0;
+  unsigned short smemMedia[10] = {'\\','\\','f','l','s','0',0};
+  Bfile_GetMediaFree_OS(smemMedia, &storageFree);
+
+  int mainMax = 0;
+  int mainUsed = 0;
+  int mainFree = 0;
+  MCS_GetState(&mainMax, &mainUsed, &mainFree);
+
+  char value[40];
+  mPrintXY(2, 3, "Calculator model", TEXT_MODE_TRANSPARENT_BACKGROUND, TEXT_COLOR_BLUE);
+  mPrintXY(4, 4, model, TEXT_MODE_TRANSPARENT_BACKGROUND, TEXT_COLOR_BLACK);
+
+  mPrintXY(2, 5, "Storage free", TEXT_MODE_TRANSPARENT_BACKGROUND, TEXT_COLOR_BLUE);
+  sprintf(value, "%d KB", storageFree / 1024);
+  mPrintXY(4, 6, value, TEXT_MODE_TRANSPARENT_BACKGROUND, TEXT_COLOR_BLACK);
+
+  mPrintXY(2, 7, "Main memory free", TEXT_MODE_TRANSPARENT_BACKGROUND, TEXT_COLOR_BLUE);
+  sprintf(value, "%d KB", mainFree / 1024);
+  mPrintXY(4, 8, value, TEXT_MODE_TRANSPARENT_BACKGROUND, TEXT_COLOR_BLACK);
+
+  mPrintXY(2, 9, "Battery voltage", TEXT_MODE_TRANSPARENT_BACKGROUND, TEXT_COLOR_BLUE);
+  int voltage = GetMainBatteryVoltage(1);
+  sprintf(value, "%d.%03d V", voltage / 1000, voltage % 1000);
+  mPrintXY(4, 10, value, TEXT_MODE_TRANSPARENT_BACKGROUND, TEXT_COLOR_BLACK);
+
+  mPrintXY(2, 11, "Real hardware", TEXT_MODE_TRANSPARENT_BACKGROUND, TEXT_COLOR_BLUE);
+  mPrintXY(4, 12, getIsEmulated() ? "No" : "Yes",
+           TEXT_MODE_TRANSPARENT_BACKGROUND, TEXT_COLOR_BLACK);
+
+  mPrintXY(2, 14, "Press EXIT to close", TEXT_MODE_TRANSPARENT_BACKGROUND, TEXT_COLOR_BLACK);
+  while(1) {
+    int key;
+    mGetKey(&key);
+    if(key == KEY_CTRL_EXIT) return;
+  }
+}
+
 int getAddins(AddIn addins[]) {
   /*searches storage memory for active and inactive add-ins, returns their count*/
   unsigned short path[MAX_FILENAME_SIZE+1], found[MAX_FILENAME_SIZE+1];
