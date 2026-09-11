@@ -403,7 +403,7 @@ int getEvents(EventDate* startdate, const char* folder, CalendarEvent* calEvents
   // Generate filename from given date
   unsigned short pFile[MAX_FILENAME_SIZE];
   eventDateToFilename(startdate, pFile, folder);
-  int hFile = Bfile_OpenFile_OS(pFile, READWRITE, 0); // Get handle
+  int hFile = Bfile_OpenFile_OS(pFile, READ, 0); // Get handle
   // Check for file existence
   if(hFile >= 0) // Check if it opened
   {

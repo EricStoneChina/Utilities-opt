@@ -176,7 +176,7 @@ int searchForFiles(File* files, const char* basepath, const char* needle, int se
           strcat(filename, (char*)buffer);
           unsigned short pFile[MAX_FILENAME_SIZE+1];
           Bfile_StrToName_ncpy(pFile, filename, MAX_FILENAME_SIZE); 
-          int hFile = Bfile_OpenFile_OS(pFile, READWRITE, 0); // Get handle
+          int hFile = Bfile_OpenFile_OS(pFile, READ, 0); // Get handle
           if(hFile >= 0) // Check if it opened
           { //opened
             unsigned char buf[1030] = ""; // initialize to zeros, and make sure it is a bit bigger

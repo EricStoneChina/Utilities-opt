@@ -114,7 +114,7 @@ int getCurrentWallet(char* wallet) {
   unsigned short ufile[MAX_FILENAME_SIZE];
   strcpy(statusfile, BALANCEFOLDER"\\Wallet");
   Bfile_StrToName_ncpy(ufile, statusfile, MAX_FILENAME_SIZE);
-  int hFile = Bfile_OpenFile_OS(ufile, READWRITE, 0); // Get handle
+  int hFile = Bfile_OpenFile_OS(ufile, READ, 0); // Get handle
   if(hFile < 0)
     return 0;
   int s = Bfile_ReadFile_OS(hFile, wallet, MAX_FILENAME_SIZE, 0);
