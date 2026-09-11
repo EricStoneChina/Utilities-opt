@@ -418,8 +418,13 @@ int getEvents(EventDate* startdate, const char* folder, CalendarEvent* calEvents
       setDBcorruptFlag(1);
       return -1;
     }
-    char asrc[MAX_EVENT_FILESIZE] = "";
+    char* asrc = (char*)malloc((MAX_EVENT_FILESIZE + 1) * sizeof(char));
+    if(asrc == NULL) {
+      Bfile_CloseFile_OS(hFile);
+      return 0;
+    }
     Bfile_ReadFile_OS(hFile, asrc, size, 0);
+    asrc[size] = '\0';
     Bfile_CloseFile_OS(hFile); //we got file contents, close it
     // Parse for events
     int curevent = 0; //current event number/array index (zero based)
@@ -442,6 +447,7 @@ int getEvents(EventDate* startdate, const char* folder, CalendarEvent* calEvents
       }
       if (curevent >= MAX_DAY_EVENTS || (limit > 0 && curevent >= limit)) {
         // reached the limit, return now. events past this point will be ignored.
+        free(asrc);
         return curevent;
       }
       src = toksplit(src, EVENT_SEPARATOR , token, 2048);
@@ -457,6 +463,7 @@ int getEvents(EventDate* startdate, const char* folder, CalendarEvent* calEvents
       // set origpos (assumes both sort functions give equivalent results for equivalent arrays)
       for(int i = 0; i < curevent; i++) simpleCalEvents[i].origpos = i;
     }
+    free(asrc);
     return curevent; //return the number of events
   } else {
     // error returned, file doesn't exist, so no events. return 0.
@@ -465,7 +472,9 @@ int getEvents(EventDate* startdate, const char* folder, CalendarEvent* calEvents
 }
 
 void getEventCountsForMonthHelper(EventDate* date, int count, int* busydays) {
-  CalendarEvent* events = (CalendarEvent*)alloca(count*sizeof(CalendarEvent));
+  if(count <= 0) return;
+  CalendarEvent* events = (CalendarEvent*)malloc(count*sizeof(CalendarEvent));
+  if(events == NULL) return;
   count = getEvents(date, CALENDARFOLDER, events);
   for(int curitem = 0; curitem < count; curitem++) {
     long int datediff = dateToDays(events[curitem].enddate.year,
@@ -488,6 +497,7 @@ void getEventCountsForMonthHelper(EventDate* date, int count, int* busydays) {
       }
     } else setDBcorruptFlag(1); // end date is before start date, which is invalid. 
   }
+  free(events);
 }
 void getEventCountsForMonth(int year, int month, int* dbuffer, int* busydays) {
   memset(dbuffer, 0, 32*sizeof(int));
@@ -668,7 +678,6 @@ void repairEventFile(char* name, const char* folder, int* checkedevents, int* pr
     *problemsfound = *problemsfound + 1;
     return;
   }
-  unsigned char asrc[MAX_EVENT_FILESIZE] = "";
   // Read file into a buffer
   if ((unsigned int)size > MAX_EVENT_FILESIZE) {
     // file too big, delete
@@ -677,7 +686,13 @@ void repairEventFile(char* name, const char* folder, int* checkedevents, int* pr
     *problemsfound = *problemsfound + 1;
     return;
   }
+  unsigned char* asrc = (unsigned char*)malloc((MAX_EVENT_FILESIZE + 1) * sizeof(unsigned char));
+  if(asrc == NULL) {
+    Bfile_CloseFile_OS(hFile);
+    return;
+  }
   Bfile_ReadFile_OS(hFile, asrc, size, 0);
+  asrc[size] = '\0';
   Bfile_CloseFile_OS(hFile); //we got file contents, close it
   
   // Let's see if the file header is OK
@@ -685,6 +700,7 @@ void repairEventFile(char* name, const char* folder, int* checkedevents, int* pr
     // strncmp was not zero, so the header is invalid.
     Bfile_DeleteEntry(pFile);
     *problemsfound = *problemsfound + 1;
+    free(asrc);
     return;
   }
   // before we give the file to getEvents, let's check if it has the right amount of field
@@ -737,6 +753,7 @@ void repairEventFile(char* name, const char* folder, int* checkedevents, int* pr
     // file corrupt / invalid format, delete it.
     Bfile_DeleteEntry(pFile);
     *problemsfound = *problemsfound + 1;
+    free(asrc);
     return;
   } else if (invalid_field_length) {
     // delete original file and recreate with fixed contents
@@ -773,6 +790,7 @@ void repairEventFile(char* name, const char* folder, int* checkedevents, int* pr
     // while this should not mess with the remaining database system, let's delete it anyway.
     Bfile_DeleteEntry(pFile);
     *problemsfound = *problemsfound + 1;
+    free(asrc);
     return;
   }
   nlen -= 4;
@@ -784,6 +802,7 @@ void repairEventFile(char* name, const char* folder, int* checkedevents, int* pr
       // some character is not a number, delete file
       Bfile_DeleteEntry(pFile);
       *problemsfound = *problemsfound + 1;
+      free(asrc);
       return;
     }
   }
@@ -802,12 +821,20 @@ void repairEventFile(char* name, const char* folder, int* checkedevents, int* pr
     // oops, date is not valid, and this is not the tasks file
     Bfile_DeleteEntry(pFile);
     *problemsfound = *problemsfound + 1;
+    free(asrc);
     return;
   }
   
   int numitems = getEvents(&thisday, folder, NULL); // get event count
   *checkedevents = *checkedevents + numitems;
-  CalendarEvent* events = (CalendarEvent*)alloca(numitems*sizeof(CalendarEvent));
+  CalendarEvent* events = NULL;
+  if(numitems > 0) {
+    events = (CalendarEvent*)malloc(numitems*sizeof(CalendarEvent));
+    if(events == NULL) {
+      free(asrc);
+      return;
+    }
+  }
   numitems = getEvents(&thisday, folder, events);
   int curitem = 0;
   int doneEdits = 0;
@@ -884,6 +911,8 @@ void repairEventFile(char* name, const char* folder, int* checkedevents, int* pr
     // replace event file...
     replaceEventFile(&thisday, events, folder, numitems);
   }
+  free(events);
+  free(asrc);
 }
 int dbRepairFlag = 0; // 1 when needs repairing
 void setDBcorruptFlag(int value) {

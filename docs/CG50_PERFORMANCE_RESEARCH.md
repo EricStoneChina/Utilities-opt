@@ -125,4 +125,5 @@ PicoC 的 Unix 测试 Makefile 还引用仓库中缺失的 `platform/platform_un
 - 已执行 `git diff --check`，通过。
 - 已用 `PrizmSDK-win-0.6` 完成一次本地 SH3EB 交叉编译和 `.g3a` 打包：`.bin` 为 148,972 bytes，`.g3a` 为 177,648 bytes。修复首轮未初始化变量后，目前只剩 PicoC 自定义 `calloc(int, int)` 与编译器内建声明不一致的旧警告，下一轮再单独处理。
 - 已完成第一项栈优化：`saveVRAMandCallSettings()` 的约 144 KiB VRAM 备份改为按需堆分配，分配失败时回退到系统保存机制；静态 `alloca` 计数由 29 降至 28。优化后 `.bin` 为 149,008 bytes，`.g3a` 为 177,684 bytes，并已重新交叉编译通过。
+- 已完成第二项栈优化：工具/钱包/TOTP 的 100 项 `CalendarEvent` 数组，以及日历读取/修复的 50 KiB 缓冲区改为按需堆分配，并覆盖释放路径；静态 `alloca` 计数进一步降至 26。当前 `.bin` 为 148,848 bytes，`.g3a` 为 177,524 bytes，交叉编译通过。
 - 尚未在 CG50/官方模拟器上运行；因此当前是“可重复构建 + 静态审计”，还不是最终的实机性能结论。

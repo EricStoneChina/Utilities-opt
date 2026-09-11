@@ -26,6 +26,11 @@ long long int llabs(long long int i) {
   if(i < 0) i = -i;
   return i;
 }
+
+static CalendarEvent* allocateCalendarEventBuffer() {
+  return (CalendarEvent*)malloc(MAX_DAY_EVENTS * sizeof(CalendarEvent));
+}
+
 void currencyToString(char* dest, Currency* orig) {
   int units = (int)(orig->val / 100LL);
   int cents = (int)(llabs(orig->val) % 100LL);
@@ -167,14 +172,19 @@ int getWalletTransactions(char* wallet, Transaction* tx, int limit) {
   // puts in the array of transactions "tx" "limit" number of transactions,
   // starting by the most recent (they come ordered because they are put in order in the file)
   // returns the number of transactions
-  CalendarEvent events[MAX_DAY_EVENTS];
+  CalendarEvent* events = allocateCalendarEventBuffer();
+  if(events == NULL) return 0;
   EventDate date;
   date.day = 0; date.month = 0; date.year = 0;
   int txcount = getEvents(&date, wallet, events, limit);
-  if(!txcount) return 0;
+  if(!txcount) {
+    free(events);
+    return 0;
+  }
   for(int i = 0; i<txcount; i++) {
     calendarEventToTransaction(&tx[i], &events[i]);
   }
+  free(events);
   return txcount;
 }
 
@@ -242,13 +252,15 @@ void addTransaction(Transaction* tx, char* wallet) {
 }
 
 void replaceWalletTransactions(Transaction* txs, char* wallet, int count) {
-  CalendarEvent events[MAX_DAY_EVENTS];
+  CalendarEvent* events = allocateCalendarEventBuffer();
+  if(events == NULL) return;
   for(int i = 0; i < count; i++) {
     transactionToCalendarEvent(&events[i], &txs[i]);
   }
   EventDate date;
   date.day = 0; date.month = 0; date.year = 0;
   replaceEventFile(&date, events, wallet, count);
+  free(events);
 }
 
 void deleteTransaction(Transaction* txs, char* wallet, int count, int pos) {
@@ -262,13 +274,15 @@ void deleteTransaction(Transaction* txs, char* wallet, int count, int pos) {
   }
   setWalletBalance(&balance, wallet);
   // now delete from transaction history:
-  CalendarEvent events[MAX_DAY_EVENTS];
+  CalendarEvent* events = allocateCalendarEventBuffer();
+  if(events == NULL) return;
   for(int i = 0; i < count; i++) {
     transactionToCalendarEvent(&events[i], &txs[i]);
   }
   EventDate date;
   date.day = 0; date.month = 0; date.year = 0;
   removeEvent(&date, events, wallet, count, pos);
+  free(events);
 }
 
 void createWallet(char* name, Currency* balance) {
@@ -386,7 +400,8 @@ unsigned int computeTOTP(totp* t) {
 }
 
 int loadTOTPs(totp* ts) {
-  CalendarEvent events[MAX_DAY_EVENTS];
+  CalendarEvent* events = allocateCalendarEventBuffer();
+  if(events == NULL) return 0;
   EventDate date;
   date.day = 0; date.month = 0; date.year = 0;
   int tokencount = getEvents(&date, TOTPFOLDER, events);
@@ -401,6 +416,7 @@ int loadTOTPs(totp* ts) {
     }
     strcpy(ts[i].name, (char*)events[i].title);
   }
+  free(events);
   return tokencount;
 }
 
@@ -417,15 +433,19 @@ void addTOTP(char* name, char* key) {
 
 void removeTOTP(int index) {
   EventDate date;
-  CalendarEvent events[MAX_DAY_EVENTS];
+  CalendarEvent* events = allocateCalendarEventBuffer();
+  if(events == NULL) return;
   int c = getEvents(&date, TOTPFOLDER, events);
   removeEvent(&date, events, TOTPFOLDER, c, index);
+  free(events);
 }
 
 void renameTOTP(int index, char* newname) {
   EventDate date;
-  CalendarEvent events[MAX_DAY_EVENTS];
+  CalendarEvent* events = allocateCalendarEventBuffer();
+  if(events == NULL) return;
   int c = getEvents(&date, TOTPFOLDER, events);
   strcpy((char*)events[index].title, newname);
   replaceEventFile(&date, events, TOTPFOLDER, c);
+  free(events);
 }
