@@ -1683,12 +1683,10 @@ int setCategoryPrompt(CalendarEvent* event) {
 }
 
 void viewEventAtPos(EventDate* date, int pos) {
-  int num = getEvents(date, CALENDARFOLDER, NULL);
-  if(num <= 0) return;
-  CalendarEvent* tmpevents = (CalendarEvent*)malloc(num*sizeof(CalendarEvent));
+  CalendarEvent* tmpevents = (CalendarEvent*)malloc(MAX_DAY_EVENTS*sizeof(CalendarEvent));
   if(tmpevents == NULL) return;
-  getEvents(date, CALENDARFOLDER, tmpevents);
-  viewEvent(&tmpevents[pos]); 
+  int num = getEvents(date, CALENDARFOLDER, tmpevents, MAX_DAY_EVENTS);
+  if(pos >= 0 && pos < num) viewEvent(&tmpevents[pos]);
   free(tmpevents);
 }
 
@@ -2178,12 +2176,14 @@ void databaseRepairScreen() {
 
 int trimCalendarCategoryHelper(EventDate* date, const int delcat) {
   // returns 1 if whole file is to be deleted, 0 otherwise
-  int ne = getEvents(date, CALENDARFOLDER, NULL);
-  int didChanges = 0;
-  if(ne <= 0) return 0;
-  CalendarEvent* ce = (CalendarEvent*)malloc(ne*sizeof(CalendarEvent));
+  CalendarEvent* ce = (CalendarEvent*)malloc(MAX_DAY_EVENTS*sizeof(CalendarEvent));
   if(ce == NULL) return 0;
-  getEvents(date, CALENDARFOLDER, ce);
+  int ne = getEvents(date, CALENDARFOLDER, ce, MAX_DAY_EVENTS);
+  int didChanges = 0;
+  if(ne <= 0) {
+    free(ce);
+    return 0;
+  }
   for(int i = 0; i < ne; i++) {
     if(ce[i].category == (unsigned int)delcat) {
       if(ne == 1) {
@@ -2194,6 +2194,7 @@ int trimCalendarCategoryHelper(EventDate* date, const int delcat) {
       for (int k = i; k < ne - 1; k++)
           ce[k] = ce[k+1];
       ne--; //this "deletes" the event
+      i--; // inspect the item shifted into this position as well
     }
   }
   if(didChanges) replaceEventFile(date, ce, CALENDARFOLDER, ne);
