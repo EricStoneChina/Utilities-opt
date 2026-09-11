@@ -35,16 +35,25 @@ void saveVRAMandCallSettings() {
   // if we have enough stack, we save it ourselves so that the screen can still be restored
   // even if the user accesses the Main Menu while in the settings.
   char* vrambackup = NULL;
-  if(stackused > 300000) SaveVRAM_1();
-  else {
+  int systemSaved = 0;
+  if(stackused > 300000) {
+    SaveVRAM_1();
+    systemSaved = 1;
+  } else {
     // no need to save status bar, because it's easy to redraw
-    vrambackup = (char*)alloca((384*(216-24)*2)*sizeof(char)); // 2 bytes per pixel
-    // MsgBoxMoveWB automatically accounts for a 24 pixels offset at the top
-    MsgBoxMoveWB(vrambackup, 0, 0, LCD_WIDTH_PX-1, LCD_HEIGHT_PX-24-1, 1);
+    vrambackup = (char*)malloc((LCD_WIDTH_PX*(LCD_HEIGHT_PX-24)*2)*sizeof(char));
+    if(vrambackup == NULL) {
+      SaveVRAM_1();
+      systemSaved = 1;
+    } else {
+      // MsgBoxMoveWB automatically accounts for a 24 pixels offset at the top
+      MsgBoxMoveWB(vrambackup, 0, 0, LCD_WIDTH_PX-1, LCD_HEIGHT_PX-24-1, 1);
+    }
   }
   settingsMenu();
-  if(stackused > 300000) LoadVRAM_1();
+  if(systemSaved) LoadVRAM_1();
   else if(vrambackup!=NULL) MsgBoxMoveWB(vrambackup, 0, 0, LCD_WIDTH_PX-1, LCD_HEIGHT_PX-24-1, 0);
+  if(vrambackup!=NULL) free(vrambackup);
 }
 void mGetKey(int* key, int darkenStatus) {
   //managed GetKey. allows for entering the settings menu from most points in the add-in.
