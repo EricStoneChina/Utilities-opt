@@ -37,6 +37,16 @@ jobs:
           & "$env:FXCGSDK\bin\make.exe" -C "$env:GITHUB_WORKSPACE" "FXCGSDK=$env:FXCGSDK"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Run static performance audit
+        shell: pwsh
+        run: |
+          $audit = & "$env:GITHUB_WORKSPACE\tools\perf-audit.ps1"
+          $audit | Tee-Object -FilePath "$env:GITHUB_STEP_SUMMARY"
+          if ($audit -match '\| alloca \| (?!0\b)') {
+            throw "alloca was reintroduced into the source tree"
+          }
+          git -C "$env:GITHUB_WORKSPACE" diff --check
+
       - name: Report artifact size
         shell: pwsh
         run: |
