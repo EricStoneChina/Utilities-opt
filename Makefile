@@ -10,7 +10,11 @@ ifeq ($(strip $(FXCGSDK)),)
 export FXCGSDK := $(abspath ../../)
 endif
 
-include $(FXCGSDK)/common/prizm_rules
+PRIZM_RULES := $(FXCGSDK)/common/prizm_rules
+ifeq ($(wildcard $(PRIZM_RULES)),)
+PRIZM_RULES := $(FXCGSDK)/toolchain/prizm_rules
+endif
+include $(PRIZM_RULES)
 
 
 #---------------------------------------------------------------------------------
@@ -28,20 +32,28 @@ INCLUDES	:=
 #---------------------------------------------------------------------------------
 # git version controlling mechanism
 #---------------------------------------------------------------------------------
-$(shell touch $(CURDIR)/src/versionProvider.cpp) #force version and timestamp defines to update.
-GIT_VERSION = $(shell sh -c 'git describe --abbrev=4 --dirty --always')
-GIT_TIMESTAMP += "$(shell git log --pretty=format:'%aD' -1)"
+GIT_VERSION = $(shell git describe --abbrev=4 --dirty --always)
+GIT_TIMESTAMP = "$(shell git log --pretty=format:%aD -1)"
 #---------------------------------------------------------------------------------
 # options for code and add-in generation
 #---------------------------------------------------------------------------------
 
 MKG3AFLAGS := -r 02.01.0001 -n basic:Utilities -n internal:UTILS -i uns:../unselected.bmp -i sel:../selected.bmp
+ifeq ($(wildcard $(FXCGSDK)/toolchain/prizm_rules),)
+else
+MKG3AFLAGS := -V 02.01.0001 -n basic:Utilities -n internal:UTILS -i uns:../unselected.bmp -i sel:../selected.bmp
+endif
 
 COMMONFLAGS = -Os -flto -fno-exceptions -Wall $(MACHDEP) $(INCLUDE) -D__GIT_VERSION=\"$(GIT_VERSION)\" -D__GIT_TIMESTAMP=\"$(GIT_TIMESTAMP)\" $(CUSTOM_FLAGS)
 CFLAGS	= -std=c99 $(COMMONFLAGS)
 CXXFLAGS	=	-std=c++11 $(COMMONFLAGS)
 
-LDFLAGS	= $(MACHDEP) -T$(FXCGSDK)/common/prizm.ld -Os -flto -Wl,-static -Wl,-gc-sections
+LINKER_SCRIPT := $(FXCGSDK)/common/prizm.ld
+ifeq ($(wildcard $(LINKER_SCRIPT)),)
+LINKER_SCRIPT := $(FXCGSDK)/toolchain/prizm.x
+endif
+
+LDFLAGS	= $(MACHDEP) -T$(LINKER_SCRIPT) -Os -flto -Wl,-static -Wl,-gc-sections
 
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
@@ -108,8 +120,13 @@ export OUTPUT	:=	$(CURDIR)/$(TARGET)
 
 #---------------------------------------------------------------------------------
 $(BUILD):
-	@[ -d $@ ] || mkdir $@
-	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+ifeq ($(OS),Windows_NT)
+	@if not exist "$@" mkdir "$@"
+	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+else
+	@mkdir -p "$@"
+	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+endif
 
 #---------------------------------------------------------------------------------
 export CYGWIN := nodosfilewarning

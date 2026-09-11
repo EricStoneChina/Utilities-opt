@@ -1,0 +1,55 @@
+name: Build Utilities
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install PrizmSDK
+        shell: pwsh
+        run: |
+          $sdkArchive = Join-Path $env:RUNNER_TEMP "PrizmSDK-win-0.6.zip"
+          $sdkExtract = Join-Path $env:RUNNER_TEMP "PrizmSDK-extracted"
+          Invoke-WebRequest `
+            -Uri "https://github.com/Jonimoose/libfxcg/releases/download/v0.6/PrizmSDK-win-0.6.zip" `
+            -OutFile $sdkArchive
+          Expand-Archive -LiteralPath $sdkArchive -DestinationPath $sdkExtract -Force
+          $sdkRoot = Get-ChildItem -LiteralPath $sdkExtract -Directory |
+            Where-Object { Test-Path (Join-Path $_.FullName "toolchain\prizm_rules") } |
+            Select-Object -First 1
+          if (-not $sdkRoot) { throw "PrizmSDK root was not found" }
+          "FXCGSDK=$($sdkRoot.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "$($sdkRoot.FullName)\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build g3a
+        shell: pwsh
+        run: |
+          & "$env:FXCGSDK\bin\make.exe" -C "$env:GITHUB_WORKSPACE" "FXCGSDK=$env:FXCGSDK"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Report artifact size
+        shell: pwsh
+        run: |
+          $g3a = Get-ChildItem "$env:GITHUB_WORKSPACE\*.g3a" | Select-Object -First 1
+          $bin = Get-ChildItem "$env:GITHUB_WORKSPACE\*.bin" | Select-Object -First 1
+          if (-not $g3a -or -not $bin) { throw "Build artifacts were not found" }
+          "g3a_bytes=$($g3a.Length)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+          "bin_bytes=$($bin.Length)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Utilities-g3a
+          path: |
+            *.g3a
+            *.bin

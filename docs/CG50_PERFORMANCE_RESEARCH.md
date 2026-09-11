@@ -51,9 +51,9 @@
 
 另外，`src/keyboardProvider.cpp` 原先只接受 `0x88000000` 开头的系统例程地址。WikiPrizm 的 CG50 兼容实现同时接受 `0x88000000` 和 `0x8C000000`，本地分支已按此补上第二种安全范围；仍需在真实 CG50 上验证返回值和锁屏/菜单返回行为。
 
-### 3. 构建环境不完整
+### 3. 构建环境与 SDK 版本差异
 
-主 `Makefile` 依赖外部 `PrizmSDK/common/prizm_rules`。本地没有安装 PrizmSDK、C/C++ 编译器或 `make`，所以当前只能完成静态审计，不能声称已经编译或测量了 `.g3a`。
+上游 `Makefile` 只面向旧版 `PrizmSDK/common/prizm_rules` 和 `common/prizm.ld`。本地分支现在兼容旧 SDK 与 `PrizmSDK-win-0.6` 的 `toolchain/prizm_rules` / `toolchain/prizm.x`，并加入了 `.github/workflows/build.yml`，由 GitHub Actions 在 Windows runner 上固定下载 SDK、构建并上传产物。
 
 PicoC 的 Unix 测试 Makefile 还引用仓库中缺失的 `platform/platform_unix.c` 和 `platform/library_unix.c`，需要先修复测试入口或明确移除失效的主机测试路径。
 
@@ -121,6 +121,7 @@ PicoC 的 Unix 测试 Makefile 还引用仓库中缺失的 `platform/platform_un
 
 ## 本轮执行状态
 
-- 已执行 `tools/perf-audit.ps1`：当前工作树统计为 171 个 C/C++ 相关文件、34,515 行；结果为静态计数，不是实机计时。
+- 已执行 `tools/perf-audit.ps1`：当前工作树统计为 171 个 C/C++ 相关文件、34,517 行；结果为静态计数，不是实机计时。
 - 已执行 `git diff --check`，通过。
-- 尚未生成 `.g3a`，也尚未在 CG50/官方模拟器上运行；本机缺少 PrizmSDK、编译器和 `make`，因此不能把当前结果称为“性能测试完成”。
+- 已用 `PrizmSDK-win-0.6` 完成一次本地 SH3EB 交叉编译和 `.g3a` 打包：`.bin` 为 148,972 bytes，`.g3a` 为 177,648 bytes。修复首轮未初始化变量后，目前只剩 PicoC 自定义 `calloc(int, int)` 与编译器内建声明不一致的旧警告，下一轮再单独处理。
+- 尚未在 CG50/官方模拟器上运行；因此当前是“可重复构建 + 静态审计”，还不是最终的实机性能结论。

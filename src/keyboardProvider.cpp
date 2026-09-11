@@ -117,6 +117,7 @@ unsigned int SetGetkeyToMainFunctionReturnFlag(unsigned int enabled) {
   if (addr < (int)0x80020070) return 0x105;
   if (addr >= (int)0x81000000) return 0x106;
 
+  unsigned int routineRegion;
   switch (*(unsigned char*)addr) {
     case 0xD0: // MOV.L @( disp, PC), Rn (REJ09B0317-0400 Rev. 4.00 May 15, 2006 page 216)
     case 0xD1:
@@ -139,7 +140,7 @@ unsigned int SetGetkeyToMainFunctionReturnFlag(unsigned int enabled) {
       addr = *(unsigned int*)addr2;
       // CG10/20 commonly place this routine in the 0x88000000 region,
       // while CG50 may place it in the 0x8C000000 region.
-      unsigned int routineRegion = ((unsigned int)addr) & 0xFF000000u;
+      routineRegion = ((unsigned int)addr) & 0xFF000000u;
       if (routineRegion != 0x88000000u && routineRegion != 0x8C000000u) return 0x109;
 
       // finally perform the desired operation and set the flag:
