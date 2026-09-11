@@ -14,9 +14,8 @@
 
 - 上游基线：`v2.1`，commit `e1b64f607b28f6932f639d575d0d3fc667d87a54`。
 - 本地分支：`codex/optimization`。
-- 源码统计：约 31,114 行，38 个 C++ 文件，81 个 C 文件；包含 PicoC 测试和第三方组件。
-- 最大应用文件：`calendarGUI.cpp` 2,303 行，`fileGUI.cpp` 1,234 行，`toolsGUI.cpp` 923 行，`calendarProvider.cpp` 868 行，`fileProvider.cpp` 805 行。
-- 静态调用计数：`Bfile_*` 317 处，`MCS*` 52 处，`alloca` 89 处，`Bdisp_AllClr_VRAM` 35 处，`sprintf` 56 处，`strcpy` 104 处，`strcat` 111 处。
+- 初始源码统计（上游快照）：约 31,114 行，38 个 C++ 文件，81 个 C 文件；包含 PicoC 测试和第三方组件。
+- 当前统计以 `tools/perf-audit.ps1` 的实际输出为准；最近一次审计为 173 个源码文件、34,927 行，`alloca` 为 0，`Bfile_*` 为 306，`MCS*` 为 36，`Bdisp_AllClr_VRAM` 为 34，`Bdisp_PutDisp_DD` 为 18。
 - 可重复审计入口：`tools/perf-audit.ps1`。它只读取源码，输出当前 revision、源码规模、高风险调用计数和所有 `alloca` 位置。
 
 这些数字是源码扫描结果，不等同于运行时热点；运行时热点必须由 CG50 或兼容模拟环境中的计时数据确认。
@@ -55,7 +54,7 @@
 
 上游 `Makefile` 只面向旧版 `PrizmSDK/common/prizm_rules` 和 `common/prizm.ld`。本地分支现在兼容旧 SDK 与 `PrizmSDK-win-0.6` 的 `toolchain/prizm_rules` / `toolchain/prizm.x`，并加入了 `.github/workflows/build.yml`，由 GitHub Actions 在 Windows runner 上固定下载 SDK、构建并上传产物。
 
-PicoC 的 Unix 测试 Makefile 还引用仓库中缺失的 `platform/platform_unix.c` 和 `platform/library_unix.c`，需要先修复测试入口或明确移除失效的主机测试路径。
+PicoC 的 Unix 测试入口已恢复为可选 readline 的主机测试，并由 Ubuntu GitHub Actions job 执行；Windows 本地环境没有宿主 GCC/Make，不能在此处代跑。
 
 ## 性能测试矩阵
 
@@ -154,4 +153,6 @@ PicoC 的 Unix 测试 Makefile 还引用仓库中缺失的 `platform/platform_un
 - 已修复 Windows `Makefile clean`：改为使用 PowerShell 字面路径清理生成目录和产物；随后完成一次从零开始的清洁交叉编译，静态 `alloca` 仍为 0。
 - 已将性能静态审计接入 GitHub Actions：每次构建都会发布审计摘要、执行 `git diff --check`，并在重新引入 `alloca` 时失败；本机缺少宿主 GCC/Make，因此 PicoC 原有 PC 测试仍待 CI 环境补跑。
 - 已恢复 PicoC 的 `UNIX_HOST` 主机入口和缺失的平台适配文件，并新增 Ubuntu GitHub Actions 回归测试 job；本机缺少宿主 GCC/Make，因此尚未在本地执行这些测试。
+- 纯读取的事件文件修复流程已改用 SDK 的 `READ` 模式打开，避免无必要的读写句柄。
+- 本轮最新提交后，本机没有可用的交叉编译器/Make；仓库中的 `.bin`/`.g3a` 是此前构建留下的忽略产物，不能作为最新提交的构建证明。应以 GitHub Actions 的构建与测试结果为准。
 - 尚未在 CG50/官方模拟器上运行；因此当前是“可重复构建 + 静态审计”，还不是最终的实机性能结论。
