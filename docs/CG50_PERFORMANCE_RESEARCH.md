@@ -143,6 +143,7 @@ PicoC 的 Unix 测试 Makefile 还引用仓库中缺失的 `platform/platform_un
 - 工具链验证确认项目没有 RTTI 用法，C++ 目标已启用 `-fno-rtti`，以移除不必要的运行时类型信息；该选项只传给 C++ 编译器。
 - 清洁构建已消除 PicoC 自定义 `calloc` 的内建声明冲突和枚举解析器未使用变量警告。
 - 日历读取和数据库修复缓冲区已改为按实际文件大小分配，不再为小文件固定占用 50 KiB；同时对文件大小读取失败增加了安全返回。
+- 文本编辑器的固定 64 KiB 栈缓冲区已移到带作用域释放的堆缓冲区，并按实际文件大小读取，进一步降低 CG50 栈峰值。
 - 已修复 Windows `Makefile clean`：改为使用 PowerShell 字面路径清理生成目录和产物；随后完成一次从零开始的清洁交叉编译，静态 `alloca` 仍为 0。
 - 已将性能静态审计接入 GitHub Actions：每次构建都会发布审计摘要、执行 `git diff --check`，并在重新引入 `alloca` 时失败；本机缺少宿主 GCC/Make，因此 PicoC 原有 PC 测试仍待 CI 环境补跑。
 - 已恢复 PicoC 的 `UNIX_HOST` 主机入口和缺失的平台适配文件，并新增 Ubuntu GitHub Actions 回归测试 job；本机缺少宿主 GCC/Make，因此尚未在本地执行这些测试。

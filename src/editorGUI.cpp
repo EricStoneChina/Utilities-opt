@@ -22,20 +22,30 @@
 #include "fileGUI.hpp"
 #include "sha1.h"
 
+struct TextEditorBufferGuard {
+  char* buffer;
+  explicit TextEditorBufferGuard(char* buffer_) : buffer(buffer_) {}
+  ~TextEditorBufferGuard() { free(buffer); }
+};
+
 void textfileEditor(char* filename, char* basefolder) {
   int newfile = (filename == NULL);
-  char sText[TEXT_BUFFER_SIZE] = "";
+  char* sText = (char*)malloc((size_t)TEXT_BUFFER_SIZE + 1);
+  TextEditorBufferGuard bufferGuard(sText);
+  if(sText == NULL) return;
+  sText[0] = '\0';
   if(!newfile) {
     newfile = 0;
     int openerror = 0;
     int hFile = fileOpen(filename); // Get handle
     if(hFile >= 0) // Check if it opened
     { //opened
-      unsigned int filesize = Bfile_GetFileSize_OS(hFile);
-      if(!filesize || filesize > TEXT_BUFFER_SIZE) {
+      int filesize = Bfile_GetFileSize_OS(hFile);
+      if(filesize <= 0 || filesize > TEXT_BUFFER_SIZE) {
         openerror = 1;
       } else {
-        Bfile_ReadFile_OS(hFile, sText, TEXT_BUFFER_SIZE, 0);
+        Bfile_ReadFile_OS(hFile, sText, filesize, 0);
+        sText[filesize] = '\0';
       }
       Bfile_CloseFile_OS(hFile);
     } else {
