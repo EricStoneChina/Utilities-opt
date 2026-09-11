@@ -85,6 +85,17 @@ void fileManager() {
   }
 }
 int smemfree = 0;
+struct FileMenuBufferGuard {
+  File*& files;
+  MenuItem*& menuitems;
+  FileMenuBufferGuard(File*& files_, MenuItem*& menuitems_)
+    : files(files_), menuitems(menuitems_) {}
+  ~FileMenuBufferGuard() {
+    free(files);
+    free(menuitems);
+  }
+};
+
 void getFileManagerStatus(char* title, int itemsinclip, int ismanager) {
   char titleBuffer[120];
   if(!itemsinclip) {
@@ -122,9 +133,11 @@ int fileManagerChild(char* browserbasepath, int* itemsinclip, int* fileAction,
   }
   File* files = NULL;
   MenuItem* menuitems = NULL;
+  FileMenuBufferGuard bufferGuard(files, menuitems);
   if(menu.numitems > 0) {
-    files = (File*)alloca(menu.numitems*sizeof(File));
-    menuitems = (MenuItem*)alloca(menu.numitems*sizeof(MenuItem));
+    files = (File*)malloc(menu.numitems*sizeof(File));
+    menuitems = (MenuItem*)malloc(menu.numitems*sizeof(MenuItem));
+    if(files == NULL || menuitems == NULL) return 0;
     // populate files array
     getFiles(files, browserbasepath, &menu.numitems);
   }
@@ -697,8 +710,12 @@ int searchFilesScreen(char* browserbasepath, char* filetojump, int itemsinclip) 
     AUX_DisplayErrorMessage( 0x01 );
     return 0;
   }
-  MenuItem* resitems = (MenuItem*)alloca(menu.numitems*sizeof(MenuItem));
-  File* files = (File*)alloca(menu.numitems*sizeof(File));
+  MenuItem* resitems = menu.numitems > 0 ?
+    (MenuItem*)malloc(menu.numitems*sizeof(MenuItem)) : NULL;
+  File* files = menu.numitems > 0 ?
+    (File*)malloc(menu.numitems*sizeof(File)) : NULL;
+  FileMenuBufferGuard bufferGuard(files, resitems);
+  if(menu.numitems > 0 && (files == NULL || resitems == NULL)) return 0;
   if(menu.numitems) {
     sres = searchForFiles(files, browserbasepath, needle, searchOnFilename, searchOnContents,
                           searchRecursively, matchCase, &menu.numitems);
