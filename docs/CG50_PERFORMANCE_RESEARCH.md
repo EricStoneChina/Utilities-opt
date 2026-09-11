@@ -138,6 +138,7 @@ PicoC 的 Unix 测试 Makefile 还引用仓库中缺失的 `platform/platform_un
 - 已将日历读取、文件内容搜索和当前钱包读取改用 SDK 的 `READ` 打开模式，避免对纯读取路径使用 `READWRITE`。
 - 已完成第十二项界面 I/O 优化：当天事件列表和任务列表改为直接读入单日最大容量并填充菜单，移除进入界面时的重复计数读取。
 - 已完成第十三项文件搜索 I/O 优化：内容搜索保留 50 字节跨块匹配窗口，但改用内存重叠缓冲区，移除每个 1 KiB 数据块对应的 `Tell/Seek` 回退调用。
+- 已完成第十四项忙闲图 I/O 优化：单日和周视图忙闲图直接读取单日最大容量，移除每个日期的计数读取；周视图最多因此省去 7 次重复文件扫描。
 - 已修复 Windows `Makefile clean`：改为使用 PowerShell 字面路径清理生成目录和产物；随后完成一次从零开始的清洁交叉编译，静态 `alloca` 仍为 0。
 - 已将性能静态审计接入 GitHub Actions：每次构建都会发布审计摘要、执行 `git diff --check`，并在重新引入 `alloca` 时失败；本机缺少宿主 GCC/Make，因此 PicoC 原有 PC 测试仍待 CI 环境补跑。
 - 已恢复 PicoC 的 `UNIX_HOST` 主机入口和缺失的平台适配文件，并新增 Ubuntu GitHub Actions 回归测试 job；本机缺少宿主 GCC/Make，因此尚未在本地执行这些测试。

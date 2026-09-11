@@ -1889,11 +1889,11 @@ void drawBusymapDay(EventDate* thisday, int startx, int starty, int width, int h
       if(showHourMarks==2) plot(startx+tx, starty-2,COLOR_GRAY);
     }
   }
-  int count = getEvents(thisday, CALENDARFOLDER, NULL);
-  CalendarEvent* events = count > 0 ?
-    (CalendarEvent*)malloc(count*sizeof(CalendarEvent)) : NULL;
-  if(count > 0 && events == NULL) return;
-  if(count > 0) count = getEvents(thisday, CALENDARFOLDER, events);
+  CalendarEvent* events = (CalendarEvent*)malloc(MAX_DAY_EVENTS*sizeof(CalendarEvent));
+  if(events == NULL) return;
+  // The busy map only needs one day's events, so load up to the storage
+  // limit directly and avoid a count-only pass over the file.
+  int count = getEvents(thisday, CALENDARFOLDER, events, MAX_DAY_EVENTS);
   int categoryColors[10] = {0xBDF7, COLOR_BLACK, COLOR_BLUE, COLOR_LIMEGREEN,
                             COLOR_CYAN, COLOR_RED, COLOR_MAGENTA, COLOR_YELLOW};
   int curitem = 0;
