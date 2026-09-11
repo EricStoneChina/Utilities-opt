@@ -384,7 +384,8 @@ void userInfo() {
   textArea text;
   text.title = (char*)"User Information";
 
-  textElement elem[10240];
+  textElement* elem = (textElement*)malloc(10240*sizeof(textElement));
+  if(elem == NULL) return;
   text.elements = elem;
   text.numelements=0;
   elem[text.numelements].text = (char*)"Current information:";
@@ -485,4 +486,5 @@ void userInfo() {
     }
   }
   doTextArea(&text);
+  free(elem);
 }
