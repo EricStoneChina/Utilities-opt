@@ -137,7 +137,10 @@ unsigned int SetGetkeyToMainFunctionReturnFlag(unsigned int enabled) {
       if (addr2 >= (int)0x81000000) return 0x108;
 
       addr = *(unsigned int*)addr2;
-      if ((addr & 0xFF000000) != 0x88000000) return 0x109;
+      // CG10/20 commonly place this routine in the 0x88000000 region,
+      // while CG50 may place it in the 0x8C000000 region.
+      unsigned int routineRegion = ((unsigned int)addr) & 0xFF000000u;
+      if (routineRegion != 0x88000000u && routineRegion != 0x8C000000u) return 0x109;
 
       // finally perform the desired operation and set the flag:
       if (enabled) *(unsigned char*)addr = 0;
