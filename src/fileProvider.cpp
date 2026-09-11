@@ -880,7 +880,11 @@ int picoc(char* SourceFile)
     // simply disable Shift+Exit (PicoC scripts can still re-enable it if they really, really want)
     setmGetKeyMode(MGETKEY_MODE_RESTRICT_RESTART);
     PicocExitValue = 0;
-    HeapMemory = (unsigned char*)alloca(HEAP_SIZE);
+    HeapMemory = (unsigned char*)malloc(HEAP_SIZE);
+    if(HeapMemory == NULL) {
+      setmGetKeyMode(MGETKEY_MODE_NORMAL);
+      return 1;
+    }
     HeapBottom = (void *)(HeapMemory + HEAP_SIZE);
     StackFrame = (void *)HeapMemory;
     HeapStackTop = (void *)HeapMemory;
@@ -890,6 +894,8 @@ int picoc(char* SourceFile)
     if (PicocPlatformSetExitPoint())
     {
         PicocCleanup();
+        free(HeapMemory);
+        HeapMemory = NULL;
         setmGetKeyMode(MGETKEY_MODE_NORMAL);
         return PicocExitValue;
     }
@@ -899,6 +905,8 @@ int picoc(char* SourceFile)
     //PicocCallMain(argc - ParamCount, &argv[ParamCount]);
     
     PicocCleanup();
+    free(HeapMemory);
+    HeapMemory = NULL;
     setmGetKeyMode(MGETKEY_MODE_NORMAL);
     return PicocExitValue;
 }

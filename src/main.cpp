@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <alloca.h>
 #include <setjmp.h>
 
 #include "settingsProvider.hpp"
@@ -77,8 +76,8 @@ int main()
     if(isBuildExpired()) buildExpiredScreen();
   }
   // load chronos
-  chronometer* chrono;
-  chrono = (chronometer*)alloca(NUMBER_OF_CHRONO*sizeof(chronometer));
+  chronometer* chrono = (chronometer*)malloc(NUMBER_OF_CHRONO*sizeof(chronometer));
+  if(chrono == NULL) return 1;
   loadChronoArray(chrono, NUMBER_OF_CHRONO);
   
   setChronoArrayPtr(chrono); //needed by the checkChronoComplete function

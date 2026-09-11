@@ -12,7 +12,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <alloca.h>
 
 #include "constantsProvider.hpp"
 #include "timeProvider.hpp"
@@ -22,6 +21,23 @@
 #include "selectorGUI.hpp"
 #include "calendarGUI.hpp"
 #include "menuGUI.hpp"
+
+struct WeekCalendarBufferGuard {
+  SimpleCalendarEvent*& events;
+  MenuItem*& menuitems;
+  WeekCalendarBufferGuard(SimpleCalendarEvent*& events_, MenuItem*& menuitems_)
+    : events(events_), menuitems(menuitems_) {}
+  ~WeekCalendarBufferGuard() {
+    free(events);
+    free(menuitems);
+  }
+};
+
+struct EventEditorBufferGuard {
+  CalendarEvent*& event;
+  EventEditorBufferGuard(CalendarEvent*& event_) : event(event_) {}
+  ~EventEditorBufferGuard() { free(event); }
+};
 #include "textGUI.hpp"
 #include "inputGUI.hpp"
 #include "calendarProvider.hpp" 
@@ -301,6 +317,9 @@ int viewWeekCalendarChild(Menu* menu, int* y, int* m, int* d, int* jumpToSel, in
   // returns 0 if the idea really is to exit the screen
   // returns 2 to switch to month view
   int oy=*y,om=*m,od=*d; //backup originally requested date before modifying it
+  SimpleCalendarEvent* events = NULL;
+  MenuItem* menuitems = NULL;
+  WeekCalendarBufferGuard bufferGuard(events, menuitems);
 
   //find sunday/monday before provided date
   long int ddays=dateToDays(*y, *m, *d);
@@ -337,9 +356,11 @@ int viewWeekCalendarChild(Menu* menu, int* y, int* m, int* d, int* jumpToSel, in
     curday++;
   }
   // allocate SimpleCalendarEvents
-  SimpleCalendarEvent* events = (SimpleCalendarEvent*)alloca(numevents*sizeof(SimpleCalendarEvent));
+  events = numevents > 0 ?
+    (SimpleCalendarEvent*)malloc(numevents*sizeof(SimpleCalendarEvent)) : NULL;
   // allocate MenuItems:
-  MenuItem menuitems[numevents+7];
+  menuitems = (MenuItem*)malloc((numevents+7)*sizeof(MenuItem));
+  if((numevents > 0 && events == NULL) || menuitems == NULL) return 0;
   
   // read events this time, populating menu at the same time
   unsigned int curmenu = 0;
@@ -970,8 +991,12 @@ void fillInputTime(EventTime* t, char* buffer) {
 }
 int eventEditor(int y, int m, int d, int type, CalendarEvent* event, int istask) {
   DefineStatusMessage((char*)"", 1, 0, 0); // clear "press OPTN for more options" message
+  CalendarEvent* allocatedEvent = NULL;
+  EventEditorBufferGuard bufferGuard(allocatedEvent);
   if(type == EVENTEDITORTYPE_ADD) {
-    event = (CalendarEvent*)alloca(sizeof(CalendarEvent));
+    allocatedEvent = (CalendarEvent*)malloc(sizeof(CalendarEvent));
+    if(allocatedEvent == NULL) return EVENTEDITOR_RETURN_EXIT;
+    event = allocatedEvent;
     
     event->startdate.day = d;
     event->startdate.month = m;
