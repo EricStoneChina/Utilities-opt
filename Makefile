@@ -131,7 +131,13 @@ endif
 #---------------------------------------------------------------------------------
 export CYGWIN := nodosfilewarning
 clean:
+ifeq ($(OS),Windows_NT)
+	@powershell.exe -NoProfile -NonInteractive -Command "if (Test-Path -LiteralPath '$(BUILD)') { Remove-Item -LiteralPath '$(BUILD)' -Recurse -Force }"
+	@powershell.exe -NoProfile -NonInteractive -Command "if (Test-Path -LiteralPath '$(OUTPUT).bin') { Remove-Item -LiteralPath '$(OUTPUT).bin' -Force }"
+	@powershell.exe -NoProfile -NonInteractive -Command "if (Test-Path -LiteralPath '$(OUTPUT).g3a') { Remove-Item -LiteralPath '$(OUTPUT).g3a' -Force }"
+else
 	$(RM) -fr $(BUILD) $(OUTPUT).bin $(OUTPUT).g3a
+endif
 
 #---------------------------------------------------------------------------------
 else
