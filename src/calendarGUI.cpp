@@ -12,7 +12,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <alloca.h>
 
 #include "constantsProvider.hpp"
 #include "timeProvider.hpp"
@@ -22,6 +21,24 @@
 #include "selectorGUI.hpp"
 #include "calendarGUI.hpp"
 #include "menuGUI.hpp"
+#include "storageProvider.hpp"
+
+struct WeekCalendarBufferGuard {
+  SimpleCalendarEvent*& events;
+  MenuItem*& menuitems;
+  WeekCalendarBufferGuard(SimpleCalendarEvent*& events_, MenuItem*& menuitems_)
+    : events(events_), menuitems(menuitems_) {}
+  ~WeekCalendarBufferGuard() {
+    free(events);
+    free(menuitems);
+  }
+};
+
+struct EventEditorBufferGuard {
+  CalendarEvent*& event;
+  EventEditorBufferGuard(CalendarEvent*& event_) : event(event_) {}
+  ~EventEditorBufferGuard() { free(event); }
+};
 #include "textGUI.hpp"
 #include "inputGUI.hpp"
 #include "calendarProvider.hpp" 
@@ -43,6 +60,8 @@ int sm, sd = 0;
 int dateselRes = 0; //whether user aborted date selection (0) or not (1)
 
 void viewCalendar(int dateselection) {
+  StorageGuard storageGuard = {0};
+  storageOperationBegin(&storageGuard);
   int res = 0;
   int type = getSetting(SETTING_DEFAULT_CALENDAR_VIEW);
   if(dateselection) type = 1; // week view can't act as date selector for now
@@ -54,8 +73,10 @@ void viewCalendar(int dateselection) {
     }
     if(type) res = viewMonthCalendar(dateselection);
     else res = viewWeekCalendar();
-    if(res) type=!type; else return;
+    if(res) type=!type;
+    else break;
   }
+  storageOperationEnd(&storageGuard);
 }
 
 int viewMonthCalendar(int dateselection) {
@@ -301,6 +322,9 @@ int viewWeekCalendarChild(Menu* menu, int* y, int* m, int* d, int* jumpToSel, in
   // returns 0 if the idea really is to exit the screen
   // returns 2 to switch to month view
   int oy=*y,om=*m,od=*d; //backup originally requested date before modifying it
+  SimpleCalendarEvent* events = NULL;
+  MenuItem* menuitems = NULL;
+  WeekCalendarBufferGuard bufferGuard(events, menuitems);
 
   //find sunday/monday before provided date
   long int ddays=dateToDays(*y, *m, *d);
@@ -319,7 +343,11 @@ int viewWeekCalendarChild(Menu* menu, int* y, int* m, int* d, int* jumpToSel, in
    
   unsigned int curday = 0; unsigned int numevents = 0;
   unsigned int fevcount[7];
-  // get event count only, so we know how many SimpleCalendarEvents to alloc
+  const unsigned int maxWeekEvents = 7 * MAX_DAY_EVENTS_WEEKVIEW;
+  events = (SimpleCalendarEvent*)malloc(maxWeekEvents*sizeof(SimpleCalendarEvent));
+  if(events == NULL) return 0;
+  unsigned int cursce = 0;
+  // Read each day once, directly populating the week event buffer.
   while(curday < 7) {
     long int ny, nm, nd;
     daysToDate(ddays, &ny, &nm, &nd);
@@ -331,19 +359,22 @@ int viewWeekCalendarChild(Menu* menu, int* y, int* m, int* d, int* jumpToSel, in
       *y = LOWEST_SUPPORTED_YEAR-1;
       return 1;
     }
-    fevcount[curday] = getEvents(&date, CALENDARFOLDER, NULL, MAX_DAY_EVENTS_WEEKVIEW);
+    int dayEvents = getEvents(&date, CALENDARFOLDER, NULL, MAX_DAY_EVENTS_WEEKVIEW,
+                              events+cursce);
+    if(dayEvents < 0) return 1;
+    fevcount[curday] = dayEvents;
     numevents += fevcount[curday];
+    cursce += fevcount[curday];
     ddays++;
     curday++;
   }
-  // allocate SimpleCalendarEvents
-  SimpleCalendarEvent* events = (SimpleCalendarEvent*)alloca(numevents*sizeof(SimpleCalendarEvent));
   // allocate MenuItems:
-  MenuItem menuitems[numevents+7];
+  menuitems = (MenuItem*)malloc((numevents+7)*sizeof(MenuItem));
+  if((numevents > 0 && events == NULL) || menuitems == NULL) return 0;
   
   // read events this time, populating menu at the same time
   unsigned int curmenu = 0;
-  unsigned int cursce = 0; // SimpleCalendarEvent index, will have their count
+  cursce = 0; // SimpleCalendarEvent index, will have their count
   ddays=dateToDays(*y, *m, *d);
   char menuitemtext[7][42];
   for(curday=0; curday < 7; curday++) {
@@ -379,10 +410,6 @@ int viewWeekCalendarChild(Menu* menu, int* y, int* m, int* d, int* jumpToSel, in
     if(ny==oy&&nm==om&&nd==od&&*jumpToSel==1) menu->selection=curmenu+1;
     curmenu++;
     if(fevcount[curday]) {
-      EventDate date;
-      date.year=ny; date.month=nm; date.day=nd;
-      // read directly into SimpleCalendarEvents
-      getEvents(&date, CALENDARFOLDER, NULL, MAX_DAY_EVENTS_WEEKVIEW, events+cursce);
       for(unsigned int k = 0; k < fevcount[curday]; k++) {
         // build menuitem
         menuitems[curmenu].text = (char*)events[cursce].title;
@@ -624,15 +651,18 @@ int viewWeekCalendarChild(Menu* menu, int* y, int* m, int* d, int* jumpToSel, in
       case KEY_CTRL_FORMAT:
         if(menu->numitems > 0 && !selIsSep) {
           int ne = getEvents(&events[msel-1].startdate, CALENDARFOLDER, NULL);
-          // we can use alloca here, as we're going to return right after
-          CalendarEvent* ce = (CalendarEvent*)alloca(ne*sizeof(CalendarEvent));
-          getEvents(&events[msel-1].startdate, CALENDARFOLDER, ce);
-          if(EVENTEDITOR_RETURN_CONFIRM == setCategoryPrompt(&ce[events[msel-1].origpos])) {
-            replaceEventFile(&events[msel-1].startdate, ce, CALENDARFOLDER, ne);
+          CalendarEvent* ce = ne > 0 ?
+            (CalendarEvent*)malloc(ne*sizeof(CalendarEvent)) : NULL;
+          if(ce != NULL) {
+            getEvents(&events[msel-1].startdate, CALENDARFOLDER, ce);
+            if(EVENTEDITOR_RETURN_CONFIRM == setCategoryPrompt(&ce[events[msel-1].origpos])) {
+              replaceEventFile(&events[msel-1].startdate, ce, CALENDARFOLDER, ne);
+            }
+            free(ce);
           }
           *jumpToSel=0;
           *keepMenuSel=1;
-          return 1; // return even if user aborted, because alloca was called inside a loop
+          return 1;
         }
         break;
       case KEY_CTRL_OPTN:
@@ -684,12 +714,18 @@ int viewEventsChild(Menu* menu, int y, int m, int d) {
   //returns 0 if the idea really is to exit the screen
   EventDate thisday;
   thisday.day = d; thisday.month = m; thisday.year = y;  
-  
-  menu->numitems = getEvents(&thisday, CALENDARFOLDER, NULL); // get event count only, to know how
-                                                              // much memory to alloc
-  CalendarEvent* events = (CalendarEvent*)alloca(menu->numitems*sizeof(CalendarEvent));
-  MenuItem* menuitems = (MenuItem*)alloca(menu->numitems*sizeof(MenuItem));
-  menu->numitems = getEvents(&thisday, CALENDARFOLDER, events);
+  CalendarEvent* events = (CalendarEvent*)malloc(MAX_DAY_EVENTS*sizeof(CalendarEvent));
+  MenuItem* menuitems = (MenuItem*)malloc(MAX_DAY_EVENTS*sizeof(MenuItem));
+  int result = 1;
+
+  if(events == NULL || menuitems == NULL) {
+    free(menuitems);
+    free(events);
+    return 0;
+  }
+  // The single-day limit is also the storage format's maximum. Read once and
+  // populate the menu directly instead of counting with a second file scan.
+  menu->numitems = getEvents(&thisday, CALENDARFOLDER, events, MAX_DAY_EVENTS);
   int curitem = 0;
   while(curitem < menu->numitems) {
     menuitems[curitem].text = (char*)events[curitem].title;
@@ -737,16 +773,18 @@ int viewEventsChild(Menu* menu, int y, int m, int d) {
     int res = doMenu(menu);
     switch(res) {
       case MENU_RETURN_EXIT:
-        return 0;
+        result = 0;
+        goto cleanup;
         break;
       case KEY_CTRL_F1:
         if(menu->fkeypage == 0 && menu->numitems > 0)
           viewEvent(&events[menu->selection-1]);
         else if (menu->fkeypage == 1 &&
-                 moveEventScreen(events, menu->numitems, menu->selection-1, 1) ==
+          moveEventScreen(events, menu->numitems, menu->selection-1, 1) ==
                  EVENTEDITOR_RETURN_CONFIRM) {
           bufmonth = 0; searchValid = 0;
-          return 1;
+          result = 1;
+          goto cleanup;
         }
         break;
       case MENU_RETURN_SELECTION:
@@ -758,14 +796,15 @@ int viewEventsChild(Menu* menu, int y, int m, int d) {
             AUX_DisplayErrorMessage( 0x2E );
           } else {
             if(EVENTEDITOR_RETURN_CONFIRM == eventEditor(y, m, d)) {
-              bufmonth=0; searchValid = 0; return 1;
+              bufmonth=0; searchValid = 0; result = 1; goto cleanup;
             }
           }
         } else if (menu->fkeypage == 1) {
           if(moveEventScreen(events, menu->numitems, menu->selection-1) ==
               EVENTEDITOR_RETURN_CONFIRM) {
             bufmonth=0; searchValid = 0;
-            return 1;
+            result = 1;
+            goto cleanup;
           }
         }
         break;
@@ -777,7 +816,8 @@ int viewEventsChild(Menu* menu, int y, int m, int d) {
               replaceEventFile(&events[menu->selection-1].startdate, events, CALENDARFOLDER, menu->numitems);
               searchValid = 0; bufmonth = 0;
             }
-            return 1; // even if the user didn't confirm the changes, we have them in our event list
+            result = 1;
+            goto cleanup; // even if the user didn't confirm the changes, reload the list
                       // discard the changes by reloading the list to a clean state.
           }
         } else if (menu->fkeypage == 1) {
@@ -795,7 +835,7 @@ int viewEventsChild(Menu* menu, int y, int m, int d) {
                 deleteAllEventsPrompt(y, m, d, 0)
               )
             ) {
-            bufmonth = 0; searchValid = 0; return 1;
+            bufmonth = 0; searchValid = 0; result = 1; goto cleanup;
           }
         }
         break;
@@ -805,7 +845,8 @@ int viewEventsChild(Menu* menu, int y, int m, int d) {
            deleteEventPrompt(events, menu->numitems, menu->selection-1)) {
           bufmonth = 0;
           searchValid = 0;
-          return 1;
+          result = 1;
+          goto cleanup;
         }
         break;
       case KEY_CTRL_F6:
@@ -819,12 +860,16 @@ int viewEventsChild(Menu* menu, int y, int m, int d) {
           replaceEventFile(&events[menu->selection-1].startdate, events,
                            CALENDARFOLDER, menu->numitems);
           searchValid = 0;
-          return 1;
+           result = 1;
+           goto cleanup;
         }
         break;
     }
   }
-  return 1;
+cleanup:
+  free(menuitems);
+  free(events);
+  return result;
 }
 
 void viewEvent(CalendarEvent* event) {
@@ -948,8 +993,12 @@ void fillInputTime(EventTime* t, char* buffer) {
 }
 int eventEditor(int y, int m, int d, int type, CalendarEvent* event, int istask) {
   DefineStatusMessage((char*)"", 1, 0, 0); // clear "press OPTN for more options" message
+  CalendarEvent* allocatedEvent = NULL;
+  EventEditorBufferGuard bufferGuard(allocatedEvent);
   if(type == EVENTEDITORTYPE_ADD) {
-    event = (CalendarEvent*)alloca(sizeof(CalendarEvent));
+    allocatedEvent = (CalendarEvent*)malloc(sizeof(CalendarEvent));
+    if(allocatedEvent == NULL) return EVENTEDITOR_RETURN_EXIT;
+    event = allocatedEvent;
     
     event->startdate.day = d;
     event->startdate.month = m;
@@ -1639,10 +1688,11 @@ int setCategoryPrompt(CalendarEvent* event) {
 }
 
 void viewEventAtPos(EventDate* date, int pos) {
-  int num = getEvents(date, CALENDARFOLDER, NULL);
-  CalendarEvent* tmpevents = (CalendarEvent*)alloca(num*sizeof(CalendarEvent));
-  getEvents(date, CALENDARFOLDER, tmpevents);
-  viewEvent(&tmpevents[pos]); 
+  CalendarEvent* tmpevents = (CalendarEvent*)malloc(MAX_DAY_EVENTS*sizeof(CalendarEvent));
+  if(tmpevents == NULL) return;
+  int num = getEvents(date, CALENDARFOLDER, tmpevents, MAX_DAY_EVENTS);
+  if(pos >= 0 && pos < num) viewEvent(&tmpevents[pos]);
+  free(tmpevents);
 }
 
 void searchEventsScreen(int y, int m, int d) {
@@ -1684,7 +1734,12 @@ void searchEventsScreen(int y, int m, int d) {
     if (res==INPUT_RETURN_EXIT) return; // user aborted
     else if (res==INPUT_RETURN_CONFIRM) break; // continue to search
   }
-  SimpleCalendarEvent* events;
+  SimpleCalendarEvent* events = NULL;
+  MenuItem* menuitems = NULL;
+  auto cleanupSearchBuffers = [&]() {
+    free(menuitems);
+    free(events);
+  };
   
   Menu menu;
   menu.scrollout=1;
@@ -1699,7 +1754,9 @@ void searchEventsScreen(int y, int m, int d) {
     case 2:
       menu.numitems = searchEventsOnYearOrMonth(y, smallmenu.selection == 1 ? 0 : m,
                                                 CALENDARFOLDER, NULL, needle, 200);
-      events = (SimpleCalendarEvent*)alloca(menu.numitems*sizeof(SimpleCalendarEvent));
+       events = menu.numitems > 0 ?
+         (SimpleCalendarEvent*)malloc(menu.numitems*sizeof(SimpleCalendarEvent)) : NULL;
+       if(menu.numitems > 0 && events == NULL) return;
       menu.numitems = searchEventsOnYearOrMonth(y, smallmenu.selection == 1 ? 0 : m,
                                                 CALENDARFOLDER, events, needle, 200);
       break;
@@ -1707,7 +1764,9 @@ void searchEventsScreen(int y, int m, int d) {
     { EventDate sday;
       sday.day = d; sday.month = m; sday.year = y;
       menu.numitems = searchEventsOnDay(&sday, CALENDARFOLDER, NULL, needle, MAX_DAY_EVENTS);
-      events = (SimpleCalendarEvent*)alloca(menu.numitems*sizeof(SimpleCalendarEvent));
+      events = menu.numitems > 0 ?
+        (SimpleCalendarEvent*)malloc(menu.numitems*sizeof(SimpleCalendarEvent)) : NULL;
+      if(menu.numitems > 0 && events == NULL) return;
       menu.numitems = searchEventsOnDay(&sday, CALENDARFOLDER, events, needle, MAX_DAY_EVENTS);
       break;
     }
@@ -1753,7 +1812,9 @@ void searchEventsScreen(int y, int m, int d) {
       }
       closeProgressMessage();
 
-      events = (SimpleCalendarEvent*)alloca(eventsCount*sizeof(SimpleCalendarEvent));
+      events = eventsCount > 0 ?
+        (SimpleCalendarEvent*)malloc(eventsCount*sizeof(SimpleCalendarEvent)) : NULL;
+      if(eventsCount > 0 && events == NULL) return;
       eventsCount = 0; // reset array start index to pass to searchEventsOnYearOrMonth
       const int yearWithEventsCount = searchTop - searchBottom + 1;
 
@@ -1768,7 +1829,12 @@ void searchEventsScreen(int y, int m, int d) {
       break;
     }
   }
-  MenuItem* menuitems = (MenuItem*)alloca(menu.numitems*sizeof(MenuItem));
+  menuitems = menu.numitems > 0 ?
+    (MenuItem*)malloc(menu.numitems*sizeof(MenuItem)) : NULL;
+  if(menu.numitems > 0 && menuitems == NULL) {
+    free(events);
+    return;
+  }
   for(int curitem = 0; curitem < menu.numitems; curitem++) {
     menuitems[curitem].text = (char*)events[curitem].title;
     menuitems[curitem].type = MENUITEM_NORMAL;
@@ -1783,6 +1849,7 @@ void searchEventsScreen(int y, int m, int d) {
     }
     switch(doMenu(&menu)) {
       case MENU_RETURN_EXIT:
+        cleanupSearchBuffers();
         return;
         break;
       case KEY_CTRL_F1:
@@ -1796,7 +1863,10 @@ void searchEventsScreen(int y, int m, int d) {
           viewEvents(events[menu.selection-1].startdate.year,
                      events[menu.selection-1].startdate.month,
                      events[menu.selection-1].startdate.day);
-          if(!searchValid) return;
+          if(!searchValid) {
+            cleanupSearchBuffers();
+            return;
+          }
         }
         break;
       case KEY_CTRL_F3:
@@ -1804,6 +1874,7 @@ void searchEventsScreen(int y, int m, int d) {
           sy=events[menu.selection-1].startdate.year;
           sm=events[menu.selection-1].startdate.month;
           sd=events[menu.selection-1].startdate.day;
+          cleanupSearchBuffers();
           return;
         }
         break;
@@ -1821,9 +1892,11 @@ void drawBusymapDay(EventDate* thisday, int startx, int starty, int width, int h
       if(showHourMarks==2) plot(startx+tx, starty-2,COLOR_GRAY);
     }
   }
-  int count = getEvents(thisday, CALENDARFOLDER, NULL);
-  CalendarEvent* events = (CalendarEvent*)alloca(count*sizeof(CalendarEvent));
-  count = getEvents(thisday, CALENDARFOLDER, events);
+  CalendarEvent* events = (CalendarEvent*)malloc(MAX_DAY_EVENTS*sizeof(CalendarEvent));
+  if(events == NULL) return;
+  // The busy map only needs one day's events, so load up to the storage
+  // limit directly and avoid a count-only pass over the file.
+  int count = getEvents(thisday, CALENDARFOLDER, events, MAX_DAY_EVENTS);
   int categoryColors[10] = {0xBDF7, COLOR_BLACK, COLOR_BLUE, COLOR_LIMEGREEN,
                             COLOR_CYAN, COLOR_RED, COLOR_MAGENTA, COLOR_YELLOW};
   int curitem = 0;
@@ -1866,6 +1939,7 @@ void drawBusymapDay(EventDate* thisday, int startx, int starty, int width, int h
     }
     curitem++;
   }
+  free(events);
 }
 void drawBusymapWeek(int y, int m, int d, int startx, int starty, int width, int height) {
   long int ddays=dateToDays(y, m, d);
@@ -1978,6 +2052,7 @@ void calendarToolsMenu(int y, int m, int d) {
 }
 
 void databaseRepairScreen() {
+  StorageScope storageScope;
   textArea text;
   text.title = (char*)"Database repair";
 
@@ -2050,7 +2125,7 @@ void databaseRepairScreen() {
   strcpy(buffer, CALENDARFOLDER"\\*.pce");
   
   file_type_t fileinfo;
-  int findhandle;
+  int findhandle = -1;
   Bfile_StrToName_ncpy(path, buffer, MAX_FILENAME_SIZE+1);
   int ret = Bfile_FindFirst_NON_SMEM((const char*)path, &findhandle, (char*)found, &fileinfo);
   int loopc = 9;
@@ -2078,7 +2153,7 @@ void databaseRepairScreen() {
     }
     ret = Bfile_FindNext_NON_SMEM(findhandle, (char*)found, (char*)&fileinfo);
   }
-  Bfile_FindClose(findhandle);
+  if (findhandle >= 0) Bfile_FindClose(findhandle);
   // update totals, because they do not include the last file checked
   itoa((int)checkedfiles, (unsigned char*)buffer1);
   elem[2].text = buffer1;
@@ -2107,24 +2182,33 @@ void databaseRepairScreen() {
 
 int trimCalendarCategoryHelper(EventDate* date, const int delcat) {
   // returns 1 if whole file is to be deleted, 0 otherwise
-  int ne = getEvents(date, CALENDARFOLDER, NULL);
+  CalendarEvent* ce = (CalendarEvent*)malloc(MAX_DAY_EVENTS*sizeof(CalendarEvent));
+  if(ce == NULL) return 0;
+  int ne = getEvents(date, CALENDARFOLDER, ce, MAX_DAY_EVENTS);
   int didChanges = 0;
-  // we can use alloca here, as we're going to return right after
-  CalendarEvent* ce = (CalendarEvent*)alloca(ne*sizeof(CalendarEvent));
-  getEvents(date, CALENDARFOLDER, ce);
+  if(ne <= 0) {
+    free(ce);
+    return 0;
+  }
   for(int i = 0; i < ne; i++) {
     if(ce[i].category == (unsigned int)delcat) {
-      if(ne == 1) return 1; // there was only one event remaining, delete file
+      if(ne == 1) {
+        free(ce);
+        return 1; // there was only one event remaining, delete file
+      }
       didChanges = 1;
       for (int k = i; k < ne - 1; k++)
           ce[k] = ce[k+1];
       ne--; //this "deletes" the event
+      i--; // inspect the item shifted into this position as well
     }
   }
   if(didChanges) replaceEventFile(date, ce, CALENDARFOLDER, ne);
+  free(ce);
   return 0;
 }
 void databaseTrimScreen() {
+  StorageScope storageScope;
   textArea text;
   text.title = (char*)"Trim database";
   text.type = TEXTAREATYPE_INSTANT_RETURN;
@@ -2198,7 +2282,7 @@ void databaseTrimScreen() {
     strcpy(buffer, CALENDARFOLDER"\\*.pce");
     
     file_type_t fileinfo;
-    int findhandle;
+    int findhandle = -1;
     Bfile_StrToName_ncpy(path, buffer, MAX_FILENAME_SIZE+1);
     int ret = Bfile_FindFirst_NON_SMEM((const char*)path, &findhandle, (char*)found, &fileinfo);
     while(!ret) {
@@ -2263,7 +2347,7 @@ void databaseTrimScreen() {
       }
       ret = Bfile_FindNext_NON_SMEM(findhandle, (char*)found, (char*)&fileinfo);
     }
-    Bfile_FindClose(findhandle);
+    if (findhandle >= 0) Bfile_FindClose(findhandle);
   }
   mMsgBoxPush(4);
   multiPrintXY(3, 2, "DB trimming\ncompleted\nsuccessfully.", TEXT_MODE_TRANSPARENT_BACKGROUND,
@@ -2273,7 +2357,9 @@ void databaseTrimScreen() {
   searchValid = 0;
 }
 int importHelper(EventDate* date, int count, textArea* text, textElement* elem, int initSuc) {
-  CalendarEvent* events = (CalendarEvent*)alloca(count*sizeof(CalendarEvent));
+  if(count <= 0) return initSuc;
+  CalendarEvent* events = (CalendarEvent*)malloc(count*sizeof(CalendarEvent));
+  if(events == NULL) return initSuc;
   getEvents(date, CALENDARFOLDER, events);
   int successful = initSuc;
   for(int curitem = 0; curitem < count; curitem++) {
@@ -2285,6 +2371,7 @@ int importHelper(EventDate* date, int count, textArea* text, textElement* elem, 
     // add the event. this will automatically put it in the correct file in the database.
     if(!addEvent(&events[curitem], CALENDARFOLDER)) successful++;
   }
+  free(events);
   return successful;
 }
 void eventImportScreen() {

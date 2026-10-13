@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <alloca.h>
 
 #include "tasksGUI.hpp"
 #include "menuGUI.hpp"
@@ -20,8 +19,11 @@
 #include "calendarProvider.hpp"
 #include "calendarGUI.hpp"
 #include "constantsProvider.hpp"
+#include "storageProvider.hpp"
 
 void viewTasks() {
+  StorageGuard storageGuard = {0};
+  storageOperationBegin(&storageGuard);
   Menu menu;
   
   menu.scrollout=1;
@@ -31,17 +33,25 @@ void viewTasks() {
   menu.title = (char*)"Tasks";
   menu.returnOnRight = 1;
   while(viewTasksChild(&menu));
+  storageOperationEnd(&storageGuard);
 }
 
 int viewTasksChild(Menu* menu) {
   //returns 1 when it wants to be restarted (refresh tasks)
   //returns 0 if the idea really is to exit the screen
   EventDate taskday;
-  
-  menu->numitems = getEvents(&taskday, CALENDARFOLDER, NULL); // get event count
-  CalendarEvent* tasks = (CalendarEvent*)alloca(menu->numitems*sizeof(CalendarEvent));
-  MenuItem* menuitems = (MenuItem*)alloca(menu->numitems*sizeof(MenuItem));
-  menu->numitems = getEvents(&taskday, CALENDARFOLDER, tasks);
+
+  CalendarEvent* tasks = (CalendarEvent*)malloc(MAX_DAY_EVENTS*sizeof(CalendarEvent));
+  MenuItem* menuitems = (MenuItem*)malloc(MAX_DAY_EVENTS*sizeof(MenuItem));
+  if(tasks == NULL || menuitems == NULL) {
+    free(tasks);
+    free(menuitems);
+    menu->numitems = 0;
+    menu->items = NULL;
+    return 0;
+  }
+  // Tasks use the zero date and share the same single-file event limit.
+  menu->numitems = getEvents(&taskday, CALENDARFOLDER, tasks, MAX_DAY_EVENTS);
   int activecount = 0;
   for(int curitem = 0; curitem < menu->numitems; curitem++) {
     menuitems[curitem].text = (char*)tasks[curitem].title;
@@ -63,6 +73,8 @@ int viewTasksChild(Menu* menu) {
     int res = doMenu(menu);
     switch(res) {
       case MENU_RETURN_EXIT:
+        free(tasks);
+        free(menuitems);
         return 0;
         break;
       case KEY_CTRL_F1:
@@ -74,6 +86,8 @@ int viewTasksChild(Menu* menu) {
           AUX_DisplayErrorMessage( 0x2E );
         } else {
           if(EVENTEDITOR_RETURN_CONFIRM == eventEditor(0, 0, 0, EVENTEDITORTYPE_ADD, NULL, 1)) {
+            free(tasks);
+            free(menuitems);
             return 1;
           }
         }
@@ -84,26 +98,38 @@ int viewTasksChild(Menu* menu) {
              EVENTEDITOR_RETURN_CONFIRM)
             replaceEventFile(&tasks[menu->selection-1].startdate, tasks, CALENDARFOLDER,
                              menu->numitems);
+          free(tasks);
+          free(menuitems);
           return 1;
         }
         break;
       case KEY_CTRL_F4:
       case KEY_CTRL_DEL:
-        if(menu->numitems > 0)
+        if(menu->numitems > 0) {
           if(EVENTDELETE_RETURN_CONFIRM ==
-             deleteEventPrompt(tasks, menu->numitems, menu->selection-1, 1))
+             deleteEventPrompt(tasks, menu->numitems, menu->selection-1, 1)) {
+            free(tasks);
+            free(menuitems);
             return 1;
+          }
+        }
         break;
       case KEY_CTRL_F5:
-        if(menu->numitems > 0)
-          if(EVENTDELETE_RETURN_CONFIRM == deleteAllEventsPrompt(0, 0, 0, 1))
+        if(menu->numitems > 0) {
+          if(EVENTDELETE_RETURN_CONFIRM == deleteAllEventsPrompt(0, 0, 0, 1)) {
+            free(tasks);
+            free(menuitems);
             return 1;
+          }
+        }
         break;
       case KEY_CTRL_F6:
         if(menu->numitems > 0) {
           tasks[menu->selection-1].repeat = !tasks[menu->selection-1].repeat;
           replaceEventFile(&tasks[menu->selection-1].startdate, tasks, CALENDARFOLDER,
                            menu->numitems);
+          free(tasks);
+          free(menuitems);
           return 1;
         }
         break;
@@ -114,6 +140,8 @@ int viewTasksChild(Menu* menu) {
           if(EVENTEDITOR_RETURN_CONFIRM == setCategoryPrompt(&tasks[menu->selection-1])) {
             replaceEventFile(&tasks[menu->selection-1].startdate, tasks, CALENDARFOLDER,
                              menu->numitems);
+            free(tasks);
+            free(menuitems);
             return 1;
           }
         }

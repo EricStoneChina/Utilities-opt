@@ -40,6 +40,7 @@ extern "C" {
 #include "../../selectorGUI.hpp"
 #include "../../settingsGUI.hpp"
 #include "../../settingsProvider.hpp"
+#include "../../storageProvider.hpp"
 #include "../../stringsProvider.hpp"
 #include "../../tasksGUI.hpp"
 #include "../../textGUI.hpp"
@@ -405,7 +406,7 @@ pcvoid(ProgressBar2)(struct ParseState *Parser, struct Value *ReturnValue, struc
 }
 
 pcvoid(DefineStatusAreaFlags)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
-    ReturnValue->Val->Integer = DefineStatusAreaFlags(Param[0]->Val->Integer, Param[1]->Val->Integer, Param[2]->Val->Pointer, Param[3]->Val->Pointer);
+    ReturnValue->Val->Integer = DefineStatusAreaFlags(Param[0]->Val->Integer, Param[1]->Val->Integer, (char*)Param[2]->Val->Pointer, (char*)Param[3]->Val->Pointer);
 }
 
 pcvoid(DefineStatusGlyph)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
@@ -515,62 +516,77 @@ pcvoid(VRAM_XORSprite)(struct ParseState *Parser, struct Value *ReturnValue, str
 // FILE
 
 pcvoid(Bfile_CloseFile_OS)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = Bfile_CloseFile_OS(Param[0]->Val->Integer);
 }
 
 pcvoid(Bfile_CreateEntry_OS)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = Bfile_CreateEntry_OS((unsigned short*)Param[0]->Val->Pointer, Param[1]->Val->Integer, (unsigned int*)Param[2]->Val->Pointer);
 }
 
 pcvoid(Bfile_DeleteEntry)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = Bfile_DeleteEntry((unsigned short*)Param[0]->Val->Pointer);
 }
 
 pcvoid(Bfile_RenameEntry)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = Bfile_RenameEntry((unsigned short*)Param[0]->Val->Pointer, (unsigned short*)Param[1]->Val->Pointer);
 }
 
 pcvoid(Bfile_FindClose)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = Bfile_FindClose(Param[0]->Val->Integer);
 }
 
 pcvoid(Bfile_FindFirst)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = Bfile_FindFirst((char*)Param[0]->Val->Pointer, (int*)Param[1]->Val->Pointer, (char*)Param[2]->Val->Pointer, Param[3]->Val->Pointer);
 }
 
 pcvoid(Bfile_FindFirst_NON_SMEM)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = Bfile_FindFirst_NON_SMEM((char*)Param[0]->Val->Pointer, (int*)Param[1]->Val->Pointer, (char*)Param[2]->Val->Pointer, Param[3]->Val->Pointer);
 }
 
 pcvoid(Bfile_FindNext)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = Bfile_FindNext(Param[0]->Val->Integer, (char*)Param[1]->Val->Pointer, (char*)Param[2]->Val->Pointer);
 }
 
 pcvoid(Bfile_FindNext_NON_SMEM)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = Bfile_FindNext_NON_SMEM(Param[0]->Val->Integer, (char*)Param[1]->Val->Pointer, (char*)Param[2]->Val->Pointer);
 }
 
 pcvoid(Bfile_GetFileSize_OS)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = Bfile_GetFileSize_OS(Param[0]->Val->Integer);
 }
 
 pcvoid(Bfile_OpenFile_OS)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = Bfile_OpenFile_OS((unsigned short*)Param[0]->Val->Pointer, Param[1]->Val->Integer, Param[2]->Val->Integer);
 }
 
 pcvoid(Bfile_ReadFile_OS)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = Bfile_ReadFile_OS(Param[0]->Val->Integer, Param[1]->Val->Pointer, Param[2]->Val->Integer, Param[3]->Val->Integer);
 }
 
 pcvoid(Bfile_SeekFile_OS)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = Bfile_SeekFile_OS(Param[0]->Val->Integer, Param[1]->Val->Integer);
 }
 
 pcvoid(Bfile_TellFile_OS)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = Bfile_TellFile_OS(Param[0]->Val->Integer);
 }
 
 pcvoid(Bfile_WriteFile_OS)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = Bfile_WriteFile_OS(Param[0]->Val->Integer, Param[1]->Val->Pointer, Param[2]->Val->Integer);
 }
 
@@ -587,34 +603,42 @@ pcvoid(Bfile_Name_MatchMask)(struct ParseState *Parser, struct Value *ReturnValu
 }
 
 pcvoid(Bfile_GetMediaFree_OS)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = Bfile_GetMediaFree_OS((unsigned short*)Param[0]->Val->Pointer, (int*)Param[1]->Val->Pointer);
 }
 
 pcvoid(SMEM_FindFirst)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = SMEM_FindFirst((unsigned short*)Param[0]->Val->Pointer, (unsigned short*)Param[1]->Val->Pointer);
 }
 
 pcvoid(MCS_CreateDirectory)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = MCS_CreateDirectory((unsigned char*)Param[0]->Val->Pointer);
 }
 
 pcvoid(MCS_DeleteDirectory)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = MCS_DeleteDirectory((unsigned char*)Param[0]->Val->Pointer);
 }
 
 pcvoid(MCSDelVar2)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = MCSDelVar2((unsigned char*)Param[0]->Val->Pointer, (unsigned char*)Param[1]->Val->Pointer);
 }
 
 pcvoid(MCS_GetCapa)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = MCS_GetCapa((int*)Param[0]->Val->Pointer);
 }
 
 pcvoid(MCSGetData1)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = MCSGetData1(Param[0]->Val->Integer, Param[1]->Val->Integer, Param[2]->Val->Pointer);
 }
 
 pcvoid(MCSGetDlen2)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = MCSGetDlen2((unsigned char*)Param[0]->Val->Pointer, (unsigned char*)Param[1]->Val->Pointer, (int*)Param[2]->Val->Pointer);
 }
 
@@ -623,22 +647,27 @@ pcvoid(MCS_GetMainMemoryStart)(struct ParseState *Parser, struct Value *ReturnVa
 }
 
 pcvoid(MCSGetOpenItem)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = MCSGetOpenItem((unsigned char*)Param[0]->Val->Pointer);
 }
 
 pcvoid(MCSOvwDat2)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = MCSOvwDat2((unsigned char*)Param[0]->Val->Pointer, (unsigned char*)Param[1]->Val->Pointer, Param[2]->Val->Integer, Param[3]->Val->Pointer, Param[4]->Val->Integer);
 }
 
 pcvoid(MCSPutVar2)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = MCSPutVar2((unsigned char*)Param[0]->Val->Pointer, (unsigned char*)Param[1]->Val->Pointer, Param[2]->Val->Integer, Param[3]->Val->Pointer);
 }
 
 pcvoid(MCS_WriteItem)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = MCS_WriteItem((unsigned char*)Param[0]->Val->Pointer, (unsigned char*)Param[1]->Val->Pointer, Param[2]->Val->ShortInteger, Param[3]->Val->Integer, Param[4]->Val->Integer);
 }
 
 pcvoid(MCS_GetState)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
+    StorageScope storageScope;
     ReturnValue->Val->Integer = MCS_GetState((int*)Param[0]->Val->Pointer, (int*)Param[1]->Val->Pointer, (int*)Param[2]->Val->Pointer);
 }
 
@@ -707,7 +736,8 @@ pcvoid(DisplayMBString)(struct ParseState *Parser, struct Value *ReturnValue, st
 }
 
 pcvoid(DisplayMBString2)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
-    DisplayMBString2(Param[0]->Val->Integer, (unsigned char*)Param[1]->Val->Pointer, Param[2]->Val->Integer, Param[3]->Val->Integer, Param[4]->Val->Integer, Param[5]->Val->Integer, Param[6]->Val->Integer, Param[7]->Val->Integer, Param[8]->Val->Integer);
+    // The current SDK adds a final key parameter; keep the historical PicoC API stable.
+    DisplayMBString2(Param[0]->Val->Integer, (unsigned char*)Param[1]->Val->Pointer, Param[2]->Val->Integer, Param[3]->Val->Integer, Param[4]->Val->Integer, Param[5]->Val->Integer, Param[6]->Val->Integer, Param[7]->Val->Integer, Param[8]->Val->Integer, 0);
 }
 
 pcvoid(EditMBStringCtrl)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
@@ -2965,7 +2995,7 @@ pcvoid(initChronometer)(struct ParseState *Parser, struct Value *ReturnValue, st
 }
 
 pcvoid(initFile)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
-    File s;
+    File s = {};
     *(File*)Param[0]->Val->Pointer = s;
 }
 
@@ -2975,7 +3005,7 @@ pcvoid(initTextInput)(struct ParseState *Parser, struct Value *ReturnValue, stru
 }
 
 pcvoid(initAddIn)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
-    AddIn s;
+    AddIn s = {};
     *(AddIn*)Param[0]->Val->Pointer = s;
 }
 
@@ -3010,7 +3040,7 @@ pcvoid(initTransaction)(struct ParseState *Parser, struct Value *ReturnValue, st
 }
 
 pcvoid(initTOTP)(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs) {
-    totp s;
+    totp s = {};
     *(totp*)Param[0]->Val->Pointer = s;
 }
 

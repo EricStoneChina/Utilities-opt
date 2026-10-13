@@ -21,7 +21,7 @@
 /*App settings.*/
 // the default value of the settings goes on settingsProvider.cpp
 
-#define SETTINGSFILE_VERSION 15 // NOTE: increase this when changing the amount or meaning of settings!
+#define SETTINGSFILE_VERSION 16 // NOTE: increase this when changing the amount or meaning of settings!
 
 #define SETTING_SELF_FILEVERSION 0 // this is a special field used by the settings system to determine file compatibility
 #define SETTING_TIMEFORMAT 1 // 0 = 24-hour HH:MM:SS ; 1 = 12-hour HH:MM:SS AM/PM
@@ -90,13 +90,19 @@
 #define SETTING_HOME_PANE_BOTTOM 27
 #define SETTING_HOME_PANE_LEFT 28
 #define SETTING_LOCK_USERNAME 29 // 0 = do not show owner info on lock screen, 1 = show (default)
+#define SETTING_LANGUAGE 30 // 0 = English, 1 = simplified Chinese
 
-#define NUMBER_OF_SETTINGS 29 // NOTE update this when adding settings. DOES NOT include the SETTING_SELF_FILEVERSION
+#define NUMBER_OF_SETTINGS 30 // NOTE update this when adding settings. DOES NOT include the SETTING_SELF_FILEVERSION
+#define LANGUAGE_ENGLISH 0
+#define LANGUAGE_CHINESE 1
 /*End of settings*/ 
 
 unsigned char getSetting(const int setting);
 void setSetting(const int setting, const unsigned char value, const int autosave);
 int loadSettings();
 void saveSettings();
+int hasSettingsBackup();
+int backupSettings();
+int restoreSettingsBackup();
 
 #endif

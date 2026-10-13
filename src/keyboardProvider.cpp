@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <alloca.h>
 extern "C" {
 #include <setjmp.h>
 }
@@ -35,17 +34,38 @@ void saveVRAMandCallSettings() {
   // if we have enough stack, we save it ourselves so that the screen can still be restored
   // even if the user accesses the Main Menu while in the settings.
   char* vrambackup = NULL;
-  if(stackused > 300000) SaveVRAM_1();
-  else {
+  int systemSaved = 0;
+  if(stackused > 300000) {
+    SaveVRAM_1();
+    systemSaved = 1;
+  } else {
     // no need to save status bar, because it's easy to redraw
-    vrambackup = (char*)alloca((384*(216-24)*2)*sizeof(char)); // 2 bytes per pixel
-    // MsgBoxMoveWB automatically accounts for a 24 pixels offset at the top
-    MsgBoxMoveWB(vrambackup, 0, 0, LCD_WIDTH_PX-1, LCD_HEIGHT_PX-24-1, 1);
+    vrambackup = (char*)malloc((LCD_WIDTH_PX*(LCD_HEIGHT_PX-24)*2)*sizeof(char));
+    if(vrambackup == NULL) {
+      SaveVRAM_1();
+      systemSaved = 1;
+    } else {
+      // MsgBoxMoveWB automatically accounts for a 24 pixels offset at the top
+      MsgBoxMoveWB(vrambackup, 0, 0, LCD_WIDTH_PX-1, LCD_HEIGHT_PX-24-1, 1);
+    }
   }
   settingsMenu();
-  if(stackused > 300000) LoadVRAM_1();
+  if(systemSaved) LoadVRAM_1();
   else if(vrambackup!=NULL) MsgBoxMoveWB(vrambackup, 0, 0, LCD_WIDTH_PX-1, LCD_HEIGHT_PX-24-1, 0);
+  if(vrambackup!=NULL) free(vrambackup);
 }
+
+void resetFunctionKeyMappings() {
+  // Built-in applications may replace the six F-key descriptors. Restore a
+  // neutral mapping whenever control returns to the add-in.
+  static const unsigned int default_fkeys[] = {
+    0x0000FFFF, 0, 0x0000FFFF, 0, 0x0000FFFF, 0,
+    0x0000FFFF, 0, 0x0000FFFF, 0, 0x0000FFFF, 0
+  };
+  Set_FKeys1(0, (unsigned int*)default_fkeys);
+  Set_FKeys2(0);
+}
+
 void mGetKey(int* key, int darkenStatus) {
   //managed GetKey. allows for entering the settings menu from most points in the add-in.
   while (1) {
@@ -117,6 +137,7 @@ unsigned int SetGetkeyToMainFunctionReturnFlag(unsigned int enabled) {
   if (addr < (int)0x80020070) return 0x105;
   if (addr >= (int)0x81000000) return 0x106;
 
+  unsigned int routineRegion;
   switch (*(unsigned char*)addr) {
     case 0xD0: // MOV.L @( disp, PC), Rn (REJ09B0317-0400 Rev. 4.00 May 15, 2006 page 216)
     case 0xD1:
@@ -137,7 +158,10 @@ unsigned int SetGetkeyToMainFunctionReturnFlag(unsigned int enabled) {
       if (addr2 >= (int)0x81000000) return 0x108;
 
       addr = *(unsigned int*)addr2;
-      if ((addr & 0xFF000000) != 0x88000000) return 0x109;
+      // CG10/20 commonly place this routine in the 0x88000000 region,
+      // while CG50 may place it in the 0x8C000000 region.
+      routineRegion = ((unsigned int)addr) & 0xFF000000u;
+      if (routineRegion != 0x88000000u && routineRegion != 0x8C000000u) return 0x109;
 
       // finally perform the desired operation and set the flag:
       if (enabled) *(unsigned char*)addr = 0;

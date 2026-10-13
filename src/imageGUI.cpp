@@ -21,8 +21,10 @@
 #include "inputGUI.hpp"
 #include "fileProvider.hpp"
 #include "tjpgd.h"
+#include "storageProvider.hpp"
 
 void viewImage(char* filename) {
+  StorageScope storageScope;
   void *work;     /* Pointer to the decompressor work area */
   JDEC jdec;    /* Decompression object */
   IODEV devid;    /* User defined device identifier */

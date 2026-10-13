@@ -4,7 +4,7 @@
 /* platform-dependent code for running programs is in this file */
 
 
-#if 0
+#if defined(UNIX_HOST)
 #ifdef UNIX_HOST
 #include <stdlib.h>
 #include <stdio.h>

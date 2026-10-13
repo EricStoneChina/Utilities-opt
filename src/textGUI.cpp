@@ -19,6 +19,24 @@
 
 typedef scrollbar TScrollbar;
 
+struct TextWordBufferGuard {
+  char* buffer;
+  size_t capacity;
+
+  TextWordBufferGuard() : buffer((char*)malloc(128)), capacity(128) {}
+
+  bool ensure(size_t required) {
+    if(required <= capacity) return true;
+    char* resized = (char*)realloc(buffer, required);
+    if(resized == NULL) return false;
+    buffer = resized;
+    capacity = required;
+    return true;
+  }
+
+  ~TextWordBufferGuard() { free(buffer); }
+};
+
 /* This file contains the bulk of the text and cursor rendering mechanism used in the text areas
  * and in the multi-line text editor. Most of the complexity and branches in the code is due to
  * cursor positioning and rendering.
@@ -49,6 +67,8 @@ void printAreaText(int* x, int* y, const char* string, color_t color, int micro,
 }
 
 int doTextArea(textArea* text) {
+  TextWordBufferGuard wordBuffer;
+  if(wordBuffer.buffer == NULL) return TEXTAREA_RETURN_EXIT;
   int scroll = text->scroll;
   int isFirstDraw = 1;
   int totalTextY = 0;
@@ -97,7 +117,8 @@ int doTextArea(textArea* text) {
         for(; (src[linelength] != '\n' && src[linelength]) || prevWasMBLead; linelength++) {
           prevWasMBLead = isMBfirst(src[linelength]);
         }
-        char singleword[linelength+2]; // includes space for NULL at the end
+        if(!wordBuffer.ensure((size_t)linelength + 2)) return TEXTAREA_RETURN_EXIT;
+        char* singleword = wordBuffer.buffer; // includes space for NULL at the end
 
         int i = 0; // index in line
         while(i < linelength) {

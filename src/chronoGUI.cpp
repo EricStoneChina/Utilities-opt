@@ -107,6 +107,15 @@ void stopAndUninstallStubTimer() {
     stubTimer=0;
   }
 }
+int isStubTimerRunning() {
+  return stubTimer > 0;
+}
+void restartStubTimerFunction() {
+  if (stubTimer <= 0) {
+    stubTimer = Timer_Install(0, doNothing, 50);
+    if (stubTimer > 0) Timer_Start(stubTimer);
+  }
+}
 void chronoScreen() {
   chronometer* chrono = getChronoArrayPtr();
   lastChronoComplete = 0; // clear possible notification on home screen

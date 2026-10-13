@@ -15,7 +15,9 @@
 #include <stdlib.h>
 #include <math.h>
 
-// CPU CLOCKING CODE
+// Legacy CPU clocking constants for the fx-CG10/20 Prizm only.  They must not
+// be used for CG50; CPU_change_freq() is guarded at runtime for compatibility
+// with existing PicoC scripts.
 
 #define PLL_28x 0b011011 // 101.5 MHz
 #define PLL_26x 0b011001 // 94.3 MHz 
@@ -42,7 +44,9 @@ int getRawBacklightSubLevel();
 void setRawBacklightSubLevel(int level);
 void getHardwareID(char* buffer);
 int getHardwareModel();
+// 1: emulator, 0: legacy hardware heuristic, -1: unknown on CG50/unknown models.
 int getIsEmulated();
+void formatBatteryVoltage(char* buffer);
 void setBrightnessToStartupSetting();
 
 #endif

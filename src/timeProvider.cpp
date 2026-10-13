@@ -156,47 +156,15 @@ int getCurrentMillisecond() {
 // UEBT - Utilities Epoch-Based Time. Like Unix time but in milliseconds. Epoch is the same.
 long long int dateTimeToUEBT(int year, int month, int day, int hour, int minute, int second,
                              int millisecond) {
-  long long int time = 0;
-  int yr = 1970;
-  int mt = 1;
-  int days;
-
-  if(year < yr) {
-    while(year+1 < yr) {
-      days = (isLeap(yr--) ? DAYS_PER_YEAR + 1 : DAYS_PER_YEAR);
-      time -= (long long int)days * SECONDS_PER_DAY*1000LL;
-    }
-    mt = 12;
-    while (month < mt) {
-      if(mt!=2) days = getMonthDays(mt--);
-      else { days = (isLeap(year)? 29 : 28); mt--; }
-      time -= (long long int)days * SECONDS_PER_DAY*1000LL;
-    }
-    days = getMonthDays(month) - day + 1;
-    time -= (long long int)days * SECONDS_PER_DAY*1000LL;
-    time -= (long long int)(23LL-hour) * SECONDS_PER_HOUR*1000LL;
-    time -= (long long int)(59LL-minute) * SECONDS_PER_MINUTE*1000LL;
-    time -= (long long int)(59LL-second)*1000LL;
-    time -= (long long int)(1000LL-millisecond);
-  } else {
-    while(yr < year) {
-      days = (isLeap(yr++) ? DAYS_PER_YEAR + 1 : DAYS_PER_YEAR);
-      time += (long long int)days * SECONDS_PER_DAY*1000LL;
-    }
-    while (mt < month) {
-      if(mt!=2) days = getMonthDays(mt++);
-      else { days = (isLeap(year)? 29 : 28); mt++; }
-      time += (long long int)days * SECONDS_PER_DAY*1000LL;
-    }
-    days = day - 1;
-    time += (long long int)days * SECONDS_PER_DAY*1000LL;
-    time += (long long int)hour * SECONDS_PER_HOUR*1000LL;
-    time += (long long int)minute * SECONDS_PER_MINUTE*1000LL;
-    time += (long long int)second*1000LL;
-    time += (long long int)millisecond;
-  }
-
-  return time;
+  // dateToDays uses the same proleptic Gregorian calendar and is already a
+  // constant-time conversion. The old implementation walked one year at a
+  // time, which could cost thousands of iterations on distant dates.
+  const long int epochDays = dateToDays(1970, 1, 1);
+  const long long int days = (long long int)dateToDays(year, month, day) - epochDays;
+  return days * SECONDS_PER_DAY * 1000LL +
+         (long long int)hour * SECONDS_PER_HOUR * 1000LL +
+         (long long int)minute * SECONDS_PER_MINUTE * 1000LL +
+         (long long int)second * 1000LL + millisecond;
 }
 
 int isRTCunadjusted() {
@@ -274,8 +242,10 @@ void timeToString(char *buffer, int h, int min, int sec, int format, int showSec
 long long int currentUEBT() { // please note, this is milliseconds from epoch and not seconds
   unsigned int fhour=0,fminute=0,fsecond=0,millisecond=0;
   RTC_GetTime(&fhour, &fminute, &fsecond, &millisecond);
-  return dateTimeToUEBT(getCurrentYear(), getCurrentMonth(), getCurrentDay(), getCurrentHour(),
-                        getCurrentMinute(), getCurrentSecond(), millisecond);
+  // RTC_GetTime already returns a consistent time snapshot. Re-reading the hour, minute and
+  // second registers here costs extra MMIO accesses and can cross a second boundary.
+  return dateTimeToUEBT(getCurrentYear(), getCurrentMonth(), getCurrentDay(), (int)fhour,
+                        (int)fminute, (int)fsecond, (int)millisecond);
 }
 
 long long int currentUTCUEBT() {

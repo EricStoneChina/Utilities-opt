@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <alloca.h>
 
 #include "homeGUI.hpp"
 #include "menuGUI.hpp"
@@ -32,6 +31,10 @@
 #include "calendarGUI.hpp"
 #include "toolsGUI.hpp"
 #include "memsysGUI.hpp"
+#include "diagnosticsGUI.hpp"
+#include "appGUI.hpp"
+#include "performanceGUI.hpp"
+#include "linkProvider.hpp"
 #include "lockGUI.hpp"
 #include "fileGUI.hpp"
 #include "editorGUI.hpp"
@@ -45,7 +48,14 @@ void homeScreen(int isLocked) {
   // find the registered username, if any:
   char* username = NULL;
   char* organization = NULL;
-  if(isLocked && getSetting(SETTING_LOCK_USERNAME)) {
+  /*
+   * The registered-user table is an undocumented legacy layout.  Do not
+   * touch it on CG50 or on an unknown model; the lock screen remains usable
+   * without displaying the optional registry fields.
+   */
+  int hardwareModel = getHardwareModel();
+  if(isLocked && getSetting(SETTING_LOCK_USERNAME) &&
+     (hardwareModel == 1 || hardwareModel == 2)) {
     char* flagpointer = (char*)0x80BE0000;
     while(*flagpointer == 0x0F) {
       if(*(flagpointer+0x2C) != '\0') {
@@ -367,16 +377,24 @@ void toolsMenu(int* pane_keycache) {
 void memsysMenu(int* pane_keycache) {
   drawFkeyPopup(4, (char*)"Memory & System");
   
-  MenuItem menuitems[5];
-  menuitems[0].text = (char*)"File manager";
-  menuitems[1].text = (char*)"Memory usage";
-  menuitems[2].text = (char*)"Function key color";
-  menuitems[3].text = (char*)"System information";
-  menuitems[4].text = (char*)"Add-In manager";
+  MenuItem menuitems[13];
+  menuitems[0].text = (char*)"Device dashboard";
+  menuitems[1].text = (char*)"Interface diagnostics";
+  menuitems[2].text = (char*)"Application audit";
+  menuitems[3].text = (char*)"Screen tools";
+  menuitems[4].text = (char*)"Performance lab";
+  menuitems[5].text = (char*)"Native system settings";
+  menuitems[6].text = (char*)"Configuration backup";
+  menuitems[7].text = (char*)"File manager";
+  menuitems[8].text = (char*)"Memory usage";
+  menuitems[9].text = (char*)"Function key color";
+  menuitems[10].text = (char*)"System information";
+  menuitems[11].text = (char*)"Link transfer";
+  menuitems[12].text = (char*)"Add-In manager";
   
   Menu menu;
   menu.items=menuitems;
-  menu.numitems = 4 + !!getSetting(SETTING_SHOW_ADVANCED);
+  menu.numitems = 12 + !!getSetting(SETTING_SHOW_ADVANCED);
   menu.width=19;
   menu.height=4;
   menu.startX=2;
@@ -390,11 +408,19 @@ void memsysMenu(int* pane_keycache) {
       case MENU_RETURN_SELECTION:
         DrawFrame(COLOR_WHITE);
         switch(menu.selection) {
-          case 1: fileManager(); break;
-          case 2: memoryCapacityScreen(); break;
-          case 3: changeFKeyColor(); break;
-          case 4: systemInfo(); break;
-          case 5: addinManager(); break;
+          case 1: deviceDashboard(); break;
+          case 2: interfaceDiagnostics(); break;
+          case 3: applicationAudit(); break;
+          case 4: screenTools(); break;
+          case 5: performanceLab(); break;
+          case 6: nativeSystemSettings(); break;
+          case 7: configurationManager(); break;
+          case 8: fileManager(); break;
+          case 9: memoryCapacityScreen(); break;
+          case 10: changeFKeyColor(); break;
+          case 11: systemInfo(); break;
+          case 12: linkCenter(); break;
+          case 13: addinManager(); break;
         }
         return;
       case KEY_CTRL_F6:
@@ -495,8 +521,11 @@ void eventsPane(int retkey, int* pane_keycache) {
   if (numevents > 0) {
     int getnum = (numevents>HOME_EVENTS_DISPLAY_FULL?HOME_EVENTS_DISPLAY_FULL:numevents);
     // ^ number of events to parse. allocate memory only for the few events we want to display
-    calevents = (CalendarEvent*)alloca(getnum*sizeof(CalendarEvent));
-    getEvents(&thisday, CALENDARFOLDER, calevents, HOME_EVENTS_DISPLAY_FULL);
+    calevents = (CalendarEvent*)malloc(getnum*sizeof(CalendarEvent));
+    if(calevents != NULL)
+      getEvents(&thisday, CALENDARFOLDER, calevents, HOME_EVENTS_DISPLAY_FULL);
+    else
+      numevents = 0;
   }
   if (getSetting(SETTING_THEME)) {
     Bdisp_Fill_VRAM( COLOR_BLACK, 2 ); //fill between the status area and f-key area
@@ -509,6 +538,7 @@ void eventsPane(int retkey, int* pane_keycache) {
   if(getSetting(SETTING_SHOW_CALENDAR_BUSY_MAP))
     drawBusymapDay(&thisday, 0, LCD_HEIGHT_PX-44, LCD_WIDTH_PX, 15, 1,0,0);
   paneHandleBasicKeys(retkey, pane_keycache);
+  free(calevents);
 }
 
 void memoryUsagePane(int retkey, int* pane_keycache) {

@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <alloca.h>
 
 #include "constantsProvider.hpp"
 #include "settingsProvider.hpp"
@@ -28,6 +27,7 @@
 #include "editorGUI.hpp"
 #include "imageGUI.hpp"
 #include "linkProvider.hpp"
+#include "storageProvider.hpp"
 #include "sprites.h"
 #ifdef ENABLE_PICOC_SUPPORT
 extern "C" {
@@ -36,6 +36,8 @@ extern "C" {
 #endif
 
 void fileManager() {
+  StorageGuard storageGuard = {0};
+  storageOperationBegin(&storageGuard);
   int res = 1;
   int itemsinclip = 0;
   int shownMainMemHelp = 0;
@@ -83,9 +85,22 @@ void fileManager() {
       #endif
     }
   }
+  storageOperationEnd(&storageGuard);
 }
 int smemfree = 0;
+struct FileMenuBufferGuard {
+  File*& files;
+  MenuItem*& menuitems;
+  FileMenuBufferGuard(File*& files_, MenuItem*& menuitems_)
+    : files(files_), menuitems(menuitems_) {}
+  ~FileMenuBufferGuard() {
+    free(files);
+    free(menuitems);
+  }
+};
+
 void getFileManagerStatus(char* title, int itemsinclip, int ismanager) {
+  StorageScope storageScope;
   char titleBuffer[120];
   if(!itemsinclip) {
     itoa(smemfree, (unsigned char*)title);
@@ -107,6 +122,7 @@ void getFileManagerStatus(char* title, int itemsinclip, int ismanager) {
 
 int fileManagerChild(char* browserbasepath, int* itemsinclip, int* fileAction,
                      int* shownMainMemHelp, File* clipboard, char* filetoedit) {
+  StorageScope storageScope;
   Menu menu;
   MenuItemIcon icontable[12];
   buildIconTable(icontable);
@@ -122,9 +138,11 @@ int fileManagerChild(char* browserbasepath, int* itemsinclip, int* fileAction,
   }
   File* files = NULL;
   MenuItem* menuitems = NULL;
+  FileMenuBufferGuard bufferGuard(files, menuitems);
   if(menu.numitems > 0) {
-    files = (File*)alloca(menu.numitems*sizeof(File));
-    menuitems = (MenuItem*)alloca(menu.numitems*sizeof(MenuItem));
+    files = (File*)malloc(menu.numitems*sizeof(File));
+    menuitems = (MenuItem*)malloc(menu.numitems*sizeof(MenuItem));
+    if(files == NULL || menuitems == NULL) return 0;
     // populate files array
     getFiles(files, browserbasepath, &menu.numitems);
   }
@@ -482,6 +500,7 @@ int deleteFilesPrompt(File* files, Menu* menu) {
 }
 
 int newFolderScreen(char* browserbasepath) {
+  StorageScope storageScope;
   //browserbasepath: folder we're working at
   //reload the files array after using this function!
   //returns 1 if user creates folder, 0 if aborts.
@@ -513,6 +532,7 @@ int newFolderScreen(char* browserbasepath) {
 }
 
 int newG3Pscreen(char* browserbasepath) {
+  StorageScope storageScope;
   //browserbasepath: folder we're working at
   //reload the files array after using this function!
   //returns 1 if user creates file, 0 if aborts.
@@ -697,8 +717,12 @@ int searchFilesScreen(char* browserbasepath, char* filetojump, int itemsinclip) 
     AUX_DisplayErrorMessage( 0x01 );
     return 0;
   }
-  MenuItem* resitems = (MenuItem*)alloca(menu.numitems*sizeof(MenuItem));
-  File* files = (File*)alloca(menu.numitems*sizeof(File));
+  MenuItem* resitems = menu.numitems > 0 ?
+    (MenuItem*)malloc(menu.numitems*sizeof(MenuItem)) : NULL;
+  File* files = menu.numitems > 0 ?
+    (File*)malloc(menu.numitems*sizeof(File)) : NULL;
+  FileMenuBufferGuard bufferGuard(files, resitems);
+  if(menu.numitems > 0 && (files == NULL || resitems == NULL)) return 0;
   if(menu.numitems) {
     sres = searchForFiles(files, browserbasepath, needle, searchOnFilename, searchOnContents,
                           searchRecursively, matchCase, &menu.numitems);
@@ -765,6 +789,7 @@ int searchFilesScreen(char* browserbasepath, char* filetojump, int itemsinclip) 
 }
 
 int viewFileInfo(File* file, int allowEdit, int itemsinclip, int allowUpDown) {
+  StorageScope storageScope;
   // returns 0 if user exits.
   // returns 1 if user wants to edit the file
   // returns 2 if user compressed or decompressed the file
@@ -979,30 +1004,27 @@ int viewFileInfo(File* file, int allowEdit, int itemsinclip, int allowUpDown) {
 }
 
 void viewFileAsText(char* filename) {
+  StorageScope storageScope;
   unsigned char* asrc = NULL;
   //Get file contents
   int hFile = fileOpen(filename); // Get handle
-  unsigned int filesize = 0;
+  int filesize = 0;
   if(hFile >= 0) // Check if it opened
   { //opened
     filesize = Bfile_GetFileSize_OS(hFile);
-    if(!filesize) {
+    if(filesize <= 0) {
       Bfile_CloseFile_OS(hFile);
       return;
     }
     if(filesize > MAX_TEXTVIEWER_FILESIZE) filesize = MAX_TEXTVIEWER_FILESIZE;
-    // check if there's enough stack to proceed:
-    if(0x881E0000 - (int)GetStackPtr() < 500000 - filesize*sizeof(unsigned char) - 30000) {
-      asrc = (unsigned char*)alloca(filesize*sizeof(unsigned char)+5);
-      Bfile_ReadFile_OS(hFile, asrc, filesize, 0);
-      Bfile_CloseFile_OS(hFile);
-      asrc[filesize] = '\0';
-    } else {
-      // there's not enough stack to put the file in RAM, so just return.
-      // this can happen when opening a file from the search results
+    asrc = (unsigned char*)malloc(filesize + 1);
+    if(asrc == NULL) {
       Bfile_CloseFile_OS(hFile);
       return;
     }
+    Bfile_ReadFile_OS(hFile, asrc, filesize, 0);
+    Bfile_CloseFile_OS(hFile);
+    asrc[filesize] = '\0';
   } else {
     //Error opening file, abort
     AUX_DisplayErrorMessage(0x2B); // Data ERROR
@@ -1028,12 +1050,16 @@ void viewFileAsText(char* filename) {
   }
   if(text.numelements > MAX_TEXTVIEWER_LINES) text.numelements = MAX_TEXTVIEWER_LINES;
 
-  textElement elem[text.numelements];
+  textElement* elem = (textElement*)malloc(text.numelements*sizeof(textElement));
+  if(elem == NULL) {
+    free(asrc);
+    return;
+  }
   text.elements = elem;
   elem[0].text = (char*)asrc;
   int ecur = 1;
   bcur = 0;
-  while(bcur < filesize && ecur <= text.numelements) {
+  while(bcur < (unsigned int)filesize && ecur <= text.numelements) {
     int jump = 1;
     if(*(asrc+bcur) == '\r' || *(asrc+bcur) == '\n') {
       // char after the next one (\n) will be the start of a new line
@@ -1048,6 +1074,8 @@ void viewFileAsText(char* filename) {
     bcur += jump;
   }
   doTextArea(&text);
+  free(elem);
+  free(asrc);
 }
 
 void viewClipboard(File* clipboard, int* itemsinclip) {

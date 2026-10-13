@@ -29,7 +29,7 @@ inline static void homeSettingsMenu();
 void settingsMenu() {
   DrawFrame(COLOR_WHITE);
   
-  MenuItem menuitems[11];
+  MenuItem menuitems[12];
   menuitems[0].text = (char*)"Set time";
   
   menuitems[1].text = (char*)"Set date";
@@ -51,11 +51,13 @@ void settingsMenu() {
   
   menuitems[9].text = (char*)"Startup brightness";
 
-  menuitems[10].text = (char*)"About this add-in";
+  menuitems[10].text = (char*)"Language";
+
+  menuitems[11].text = (char*)"About this add-in";
   
   Menu menu;
   menu.items=menuitems;
-  menu.numitems=11;
+  menu.numitems=12;
   menu.scrollout=1;
   menu.statusText = (char*)"";
   setmGetKeyMode(MGETKEY_MODE_RESTRICT_SETTINGS);
@@ -161,7 +163,28 @@ void settingsMenu() {
           setSetting(SETTING_STARTUP_BRIGHTNESS, sel.value, 1);
           break;
         }
-        case 11:
+        case 11: {
+          mMsgBoxPush(4);
+          MenuItem smallmenuitems[2];
+          smallmenuitems[0].text = (char*)"English";
+          smallmenuitems[1].text = (char*)"Chinese";
+
+          Menu smallmenu;
+          smallmenu.items=smallmenuitems;
+          smallmenu.numitems=2;
+          smallmenu.width=17;
+          smallmenu.height=4;
+          smallmenu.startX=3;
+          smallmenu.startY=2;
+          smallmenu.selection=getSetting(SETTING_LANGUAGE)+1;
+          smallmenu.title=(char*)"Language";
+          int sres = doMenu(&smallmenu);
+          if(sres == MENU_RETURN_SELECTION)
+            setSetting(SETTING_LANGUAGE, smallmenu.selection-1, 1);
+          mMsgBoxPop();
+          break;
+        }
+        case 12:
           aboutScreen();
           break;
       }
