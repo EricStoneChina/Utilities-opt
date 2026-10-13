@@ -21,6 +21,26 @@ int unlockCalc();
 int lockCalc();
 void lockApp();
 extern jmp_buf utilities_return;
+
+#define RUNMAT_RESULT_NONE         0
+#define RUNMAT_RESULT_SHIFT_EXIT   1
+#define RUNMAT_RESULT_APP_RETURN   2
+#define RUNMAT_RESULT_EXIT         3
+
+#define RUNMAT_ERROR_NO_CAPABILITY -1
+#define RUNMAT_ERROR_TIMER_INSTALL -2
+
+typedef struct {
+  int active;
+  int timerId;
+  unsigned int launchCount;
+  unsigned int returnCount;
+  int lastResult;
+  int lastError;
+} RunMatStatus;
+
 void openRunMat();
 void returnToUtilitiesHandler();
+void finalizeRunMatReturn();
+void getRunMatStatus(RunMatStatus* status);
 #endif

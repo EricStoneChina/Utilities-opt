@@ -16,6 +16,14 @@
 #define SETTINGSFILE (unsigned char*)"Set"
 #endif
 
+#ifndef SETTINGS_BACKUP_FILE
+#define SETTINGS_BACKUP_FILE (unsigned char*)"Set.bak"
+#endif
+
+#ifndef SETTINGS_ROLLBACK_FILE
+#define SETTINGS_ROLLBACK_FILE (unsigned char*)"Set.rollback"
+#endif
+
 #ifndef CHRONOFILE
 #define CHRONOFILE (unsigned char*)"Chrono"
 #endif

@@ -21,6 +21,7 @@
 #include "selectorGUI.hpp"
 #include "textGUI.hpp"
 #include "menuGUI.hpp"
+#include "stringsProvider.hpp"
 
 const char* getDayEnding(int day) {
   //st,nd,rd,th code:
@@ -48,46 +49,79 @@ void drawLongDate(int textY, int format, int colorfg, int colorbg, int miniminii
   // x coordinate is set automatically (text is always centered on screen)
   // NOTE: does not update VRAM contents to screen
   int curYear = getCurrentYear();  
+  int curMonth = getCurrentMonth();
   int curDay = getCurrentDay();
+  const char* dow = localizeText(getCurrentDOWAsString());
+  const char* month = localizeText(getCurrentMonthAsString());
+  // Chinese dates do not use English ordinal suffixes (st/nd/rd/th).
+  const char* dayEnding = isChineseLanguage() ? "" : getDayEnding(curDay);
 
   char buffer[50];
-  switch(format) {
+  if (isChineseLanguage()) {
+    const int includeDow = format == 0 || format == 1 || format == 2 || format == 3;
+    const int includeYear = format == 0 || format == 1 || format == 2 ||
+                            format == 4 || format == 5 || format == 7 || format == 8;
+    if (includeYear)
+      sprintf(buffer, "%d\xc4\xea%d\xd4\xc2%d\xc8\xd5%s%s", curYear, curMonth,
+              curDay, includeDow ? " " : "", includeDow ? dow : "");
+    else
+      sprintf(buffer, "%d\xd4\xc2%d\xc8\xd5%s%s", curMonth, curDay,
+              includeDow ? " " : "", includeDow ? dow : "");
+  } else switch(format) {
     case 0:
-      sprintf(buffer, "%s, %s %d", getCurrentDOWAsString(), getCurrentMonthAsString(), curDay);
+      sprintf(buffer, "%s, %s %d", dow, month, curDay);
       break;
     case 1:
     case 3:
-      sprintf(buffer, "%s, %d%s %s", getCurrentDOWAsString(), curDay,
-              getDayEnding(curDay), getCurrentMonthAsString());
+      sprintf(buffer, "%s, %d%s %s", dow, curDay, dayEnding, month);
       break;
     case 2:
-      sprintf(buffer, "%s, %d%s %s %d", getCurrentDOWAsString(), curDay, getDayEnding(curDay),
-              getCurrentMonthAsString(), curYear);
+      sprintf(buffer, "%s, %d%s %s %d", dow, curDay, dayEnding, month, curYear);
       break;
     case 4:
     case 6: //it's exactly the same except minimini is not used, but that's not handled here
-      sprintf(buffer, "%s %d", getCurrentMonthAsString(), curDay);
+      sprintf(buffer, "%s %d", month, curDay);
       break;
     case 5:
-      sprintf(buffer, "%s %d, %d", getCurrentMonthAsString(), curDay, curYear);
+      sprintf(buffer, "%s %d, %d", month, curDay, curYear);
       break;
     case 7:
     case 9: //exactly the same except minimini, not handled here
-      sprintf(buffer, "%d%s %s", curDay, getDayEnding(curDay), getCurrentMonthAsString());
+      sprintf(buffer, "%d%s %s", curDay, dayEnding, month);
       break;
     case 8:
-      sprintf(buffer, "%d%s %s %d", curDay, getDayEnding(curDay), getCurrentMonthAsString(),
-              curYear);
+      sprintf(buffer, "%d%s %s %d", curDay, dayEnding, month, curYear);
       break;
   }
 
+  if (isChineseLanguage()) {
+    // The mini font has no Chinese glyphs; use the same font path as UI labels.
+    // This GBK date uses 18-pixel ASCII and 24-pixel two-byte Chinese glyphs.
+    int width = 0;
+    for (const unsigned char* p = (const unsigned char*)buffer; *p; p++)
+      width += *p < 0x80 ? 18 : 12;
+    int column = (LCD_WIDTH_PX - width) / 36 + 1;
+    if (column < 1) column = 1;
+    int row = (textY + 24) / 24;
+    if (row < 0 || row > 7) return;
+    int x = (column - 1) * 18;
+    if (width > LCD_WIDTH_PX - x) width = LCD_WIDTH_PX - x;
+    int indexedColor = colorbg == COLOR_BLACK ? TEXT_COLOR_WHITE : TEXT_COLOR_BLACK;
+    drawRectangle(x, row * 24, width, 24, colorbg);
+    mPrintXY(column, row, buffer, TEXT_MODE_TRANSPARENT_BACKGROUND, indexedColor);
+    replaceColorInArea(x, row * 24, width, 24,
+                       indexedColor == TEXT_COLOR_WHITE ? COLOR_WHITE : COLOR_BLACK,
+                       colorfg);
+    return;
+  }
   int textX = 0;
   //Use PrintMini to get length in pixels of the string, then draw it on the middle of the screen
-  PrintMini(&textX, &textY, buffer, 0, 0xFFFFFFFF, 0, 0, colorfg, colorbg, 0, 0); //get length
+  mPrintMini(&textX, &textY, buffer, 0, 0xFFFFFFFF, 0, 0, colorfg, colorbg, 0, 0); //get length
   textX = LCD_WIDTH_PX/2 - textX/2; //center
-  PrintMini(&textX, &textY, buffer, 0, 0xFFFFFFFF, 0, 0, colorfg, colorbg, 1, 0); //draw
+  mPrintMini(&textX, &textY, buffer, 0, 0xFFFFFFFF, 0, 0, colorfg, colorbg, 1, 0); //draw
   
-  if (format == 0 || format == 1 || format == 4 || format == 7) {
+  if (!isChineseLanguage() &&
+      (format == 0 || format == 1 || format == 4 || format == 7)) {
     // draw year in minimini font
     char buffer2[10];
     itoa(curYear, (unsigned char*)buffer2);

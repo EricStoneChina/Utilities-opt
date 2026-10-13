@@ -25,16 +25,35 @@
 #include "firstRunGUI.hpp"
 #include "aboutGUI.hpp"
 #include "graphicsProvider.hpp"
+#include "stringsProvider.hpp"
 #include "timeProvider.hpp"
 #include "debugGUI.hpp"
+#include "lockGUI.hpp"
+#include "storageProvider.hpp"
+#include "performanceGUI.hpp"
 jmp_buf utilities_return;
 extern color_t* VRAM_base;
+static chronometer* utilitiesChrono = NULL;
+static int utilitiesStartupTicks = 0;
+static int utilitiesStartupMeasured = 0;
 int main()
 {
   // Add-in entry point
+  if (!utilitiesStartupMeasured) utilitiesStartupTicks = RTC_GetTicks();
   
   if(setjmp(utilities_return)) {
-    // we are returning from RunMat after the calc was locked.
+    // We may be returning from Run-Mat, or from the normal add-in restart
+    // shortcut.  The cleanup helper is idempotent for both paths.
+    storageOperationRecover();
+    finalizeRunMatReturn();
+    // longjmp skips normal stack unwinding.  Release the old chronometer
+    // array before rebuilding the add-in state so repeated Run-Mat returns do
+    // not leak one array per launch.
+    if (utilitiesChrono != NULL) {
+      free(utilitiesChrono);
+      utilitiesChrono = NULL;
+      setChronoArrayPtr(NULL);
+    }
     // turn off blinking cursor and clear strange keys remapping
     Cursor_SetFlashOff();
     Bkey_ClrAllFlags();
@@ -46,10 +65,7 @@ int main()
      * still, his comment about there being a "host" and an add-in being run from RAM doesn't seem
      * to apply here.
      */
-    static const unsigned int default_fkeys[] = {0x0000FFFF,0,0x0000FFFF,0,0x0000FFFF,0,0x0000FFFF,
-                                                 0,0x0000FFFF,0,0x0000FFFF,0 };
-    Set_FKeys1(0, (unsigned int*)default_fkeys);
-    Set_FKeys2(0);
+    resetFunctionKeyMappings();
     Bdisp_EnableColor(1);
     // workaround to enable color: we must use GetKey once, otherwise color might not be enabled
     Keyboard_PutKeycode( -1, -1, KEY_CTRL_EXIT);
@@ -61,6 +77,8 @@ int main()
   Bkey_SetAllFlags(0x80);
   //Load settings
   loadSettings();
+  if (isChineseLanguage()) EnableGB18030();
+  else DisableGB18030();
   
   // Adjust UI and HW values according to settings
   // Set brightness if setting is set
@@ -76,13 +94,19 @@ int main()
     if(isBuildExpired()) buildExpiredScreen();
   }
   // load chronos
-  chronometer* chrono = (chronometer*)malloc(NUMBER_OF_CHRONO*sizeof(chronometer));
-  if(chrono == NULL) return 1;
-  loadChronoArray(chrono, NUMBER_OF_CHRONO);
+  utilitiesChrono = (chronometer*)malloc(NUMBER_OF_CHRONO*sizeof(chronometer));
+  if(utilitiesChrono == NULL) return 1;
+  loadChronoArray(utilitiesChrono, NUMBER_OF_CHRONO);
   
-  setChronoArrayPtr(chrono); //needed by the checkChronoComplete function
+  setChronoArrayPtr(utilitiesChrono); //needed by the checkChronoComplete function
+  if (!utilitiesStartupMeasured) {
+    performanceRecordStartupMilliseconds(
+        tickDifferenceToMilliseconds(utilitiesStartupTicks, RTC_GetTicks()));
+    utilitiesStartupMeasured = 1;
+  }
 
 #ifdef LOG_BATTERY_VOLTAGE
+  StorageScope storageScope;
   // log battery voltage on every start-up
   char smemfile[50];
   strcpy(smemfile, SMEM_PREFIX"battlog.txt");

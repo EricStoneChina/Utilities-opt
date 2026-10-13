@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <alloca.h>
 
 #include "constantsProvider.hpp"
 #include "timeProvider.hpp"
@@ -19,8 +18,10 @@
 #include "selectorGUI.hpp"
 #include "chronoProvider.hpp"
 #include "chronoGUI.hpp"
+#include "storageProvider.hpp"
 
 void saveChronoArray(chronometer* chronoarray, int count) {
+  StorageScope storageScope;
   // count is the amount of chrono in array
   int allClear = 1;
   for(int cur = 0; cur < count; cur++) {
@@ -41,6 +42,7 @@ void saveChronoArray(chronometer* chronoarray, int count) {
 }
 
 void loadChronoArray(chronometer* chronoarray, int count) {
+  StorageScope storageScope;
   // count is the amount of chrono to load to array
   int size;
   MCSGetDlen2(DIRNAME, CHRONOFILE, &size);

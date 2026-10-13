@@ -31,6 +31,7 @@ typedef struct
 
 void memoryCapacityScreen(int isPaneOffset=0);
 void deviceDashboard();
+void nativeSystemSettings();
 int getAddins(AddIn addins[]);
 void addinManager();
 int addinManagerChild(Menu* menu);

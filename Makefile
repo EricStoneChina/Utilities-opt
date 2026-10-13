@@ -38,10 +38,10 @@ GIT_TIMESTAMP = "$(shell git log --pretty=format:%aD -1)"
 # options for code and add-in generation
 #---------------------------------------------------------------------------------
 
-MKG3AFLAGS := -r 02.01.0001 -n basic:Utilities -n internal:UTILS -i uns:../unselected.bmp -i sel:../selected.bmp
+MKG3AFLAGS := -r 02.01.0001 -n basic:Utilities -n internal:UTILS -i uns:../assets/icons/unselected.png -i sel:../assets/icons/selected.png
 ifeq ($(wildcard $(FXCGSDK)/toolchain/prizm_rules),)
 else
-MKG3AFLAGS := -V 02.01.0001 -n basic:Utilities -n internal:UTILS -i uns:../unselected.bmp -i sel:../selected.bmp
+MKG3AFLAGS := -V 02.01.0001 -n basic:Utilities -n internal:UTILS -i uns:../assets/icons/unselected.png -i sel:../assets/icons/selected.png
 endif
 
 COMMONFLAGS = -Os -flto -fno-exceptions -fno-builtin-calloc -Wall $(MACHDEP) $(INCLUDE) -D__GIT_VERSION=\"$(GIT_VERSION)\" -D__GIT_TIMESTAMP=\"$(GIT_TIMESTAMP)\" $(CUSTOM_FLAGS)
@@ -116,6 +116,8 @@ export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib) \
 					-L$(LIBFXCG_LIB)
 
 export OUTPUT	:=	$(CURDIR)/$(TARGET)
+export ICON_SOURCES := $(dir $(OUTPUT))assets/icons/selected.png \
+                       $(dir $(OUTPUT))assets/icons/unselected.png
 .PHONY: $(BUILD) clean
 
 #---------------------------------------------------------------------------------
@@ -147,7 +149,7 @@ DEPENDS	:=	$(OFILES:.o=.d)
 #---------------------------------------------------------------------------------
 # main targets
 #---------------------------------------------------------------------------------
-$(OUTPUT).g3a: $(OUTPUT).bin
+$(OUTPUT).g3a: $(OUTPUT).bin $(ICON_SOURCES)
 $(OUTPUT).bin: $(OFILES)
 
 

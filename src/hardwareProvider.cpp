@@ -54,12 +54,21 @@ int getHardwareModel() {
 }
 
 int getIsEmulated() {
-  /* returns 1 if the calculator is emulated
-   * uses the power source information to detect the emulator
-   * obviously, if an emulator comes that emulates this info better, this function will not work.
-   */
+  // CG50 emulators can reproduce the power register; it cannot prove hardware.
+  int model = getHardwareModel();
+  if (model == 3 || model == 0) return -1;
   int k = *(unsigned char*)P11DR;
   return !k;
+}
+
+void formatBatteryVoltage(char* buffer) {
+  if (buffer == NULL) return;
+  int centivolts = GetMainBatteryVoltage(1);
+  if (centivolts < 0) {
+    strcpy(buffer, "n/a");
+    return;
+  }
+  sprintf(buffer, "%d.%02d V", centivolts / 100, centivolts % 100);
 }
 
 void setBrightnessToStartupSetting() {
@@ -68,9 +77,17 @@ void setBrightnessToStartupSetting() {
   }
 }
 
-// CPU CLOCKING CODE (used only from PicoC scripts)
+// Legacy CPU clocking code (used only from PicoC scripts).
+//
+// The register sequence below belongs to the original fx-CG10/20 Prizm
+// clocking interface.  The fx-CG50 has a different native clock and memory
+// timing profile; never expose this sequence on CG50, emulators, or unknown
+// hardware.  Keep the symbol for source compatibility with old scripts, but
+// make unsupported calls a safe no-op.
 
 void CPU_change_freq(int mult) { 
+   const int model = getHardwareModel();
+   if (model != 1 && model != 2) return;
    __asm__( 
       "mov r4, r0\n\t" 
       "and #0x3F, r0\n\t"  

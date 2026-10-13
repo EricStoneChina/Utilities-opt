@@ -16,6 +16,56 @@
 #include "menuGUI.hpp"
 #include "graphicsProvider.hpp"
 #include "textGUI.hpp"
+#include "storageProvider.hpp"
+#include "chronoGUI.hpp"
+#include "keyboardProvider.hpp"
+#include "platformProvider.hpp"
+
+void linkCenter() {
+  if (!platformHasCapability(PLATFORM_CAP_LINK)) {
+    Bdisp_AllClr_VRAM();
+    drawScreenTitle("Link unavailable");
+    mPrintXY(2, 4, "This platform has no native Link.",
+             TEXT_MODE_TRANSPARENT_BACKGROUND, TEXT_COLOR_RED);
+    mPrintXY(2, 7, "Press EXIT to close",
+             TEXT_MODE_TRANSPARENT_BACKGROUND, TEXT_COLOR_BLACK);
+    int key;
+    do {
+      mGetKey(&key);
+    } while (key != KEY_CTRL_EXIT);
+    return;
+  }
+
+  mMsgBoxPush(4);
+  multiPrintXY(3, 2, "Open native Link transfer?",
+               TEXT_MODE_TRANSPARENT_BACKGROUND, TEXT_COLOR_BLACK);
+  if (!closeMsgBox(1, 4)) return;
+
+  // The native dialog consumes a 0x30-byte descriptor and a 0x214-byte
+  // zeroed work buffer. Both live in writable RAM.
+  unsigned char descriptor[0x30];
+  unsigned char work[0x214];
+  memset(descriptor, 0, sizeof(descriptor));
+  memset(work, 0, sizeof(work));
+  const int chronometerWasRunning = isStubTimerRunning();
+  if (chronometerWasRunning) stopAndUninstallStubTimer();
+  Bkey_ClrAllFlags();
+  const int previousMenuReturnFlag = GetGetkeyToMainFunctionReturnFlag();
+  SetGetkeyToMainFunctionReturnFlag(0);
+  App_InitDlgDescriptor(descriptor, 0);
+  APP_LINK_transmit_select_dialog(descriptor, work);
+
+  // Native Link normally returns after its dialog closes. Restore state that
+  // could otherwise make the next Utilities page look stale.
+  SetGetkeyToMainFunctionReturnFlag(previousMenuReturnFlag);
+  Bkey_ClrAllFlags();
+  Cursor_SetFlashOff();
+  resetFunctionKeyMappings();
+  Bdisp_EnableColor(1);
+  Bdisp_AllClr_VRAM();
+  Bdisp_PutDisp_DD();
+  if (chronometerWasRunning) restartStubTimerFunction();
+}
 
 // code based on example by Simon Lothar
 // send a file through the 3-pin serial. Compatible with Casio's functions.
@@ -52,6 +102,7 @@ void endSerialComm(int error) {
 }
 
 void serialTransferSingleFile(char* filename) {
+  StorageScope storageScope;
   if(strncmp(filename, SMEM_PREFIX, 7)) return; // ERROR
 
   textArea text;

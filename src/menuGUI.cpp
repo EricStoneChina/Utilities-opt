@@ -27,13 +27,21 @@ int doMenu(Menu* menu, MenuItemIcon* icontable) {
   // char Y where to start drawing the menu items. Having a title increases this by one:
   int itemsStartY=menu->startY;
 
-  int itemsHeight=menu->height;
   int showTitle = menu->title != NULL;
-  int showScrollbar = menu->numitems > menu->height - showTitle ? 1 : 0;
+  int itemsHeight=menu->height;
   if (showTitle) {
     itemsStartY++;
     itemsHeight--;
   }
+  // Row 0 is reserved for the status area and row 7 is the last drawable
+  // PrintXY row. Older callers commonly use the default height of 8 with a
+  // start row of 1, which otherwise places the last item at y=8 and silently
+  // drops it from the display.
+  int availableHeight = 8 - itemsStartY;
+  if (availableHeight < 1) availableHeight = 1;
+  if (itemsHeight > availableHeight) itemsHeight = availableHeight;
+  if (itemsHeight < 1) itemsHeight = 1;
+  int showScrollbar = menu->numitems > itemsHeight ? 1 : 0;
   if(menu->selection < 1) menu->selection = 1;
   else if(menu->selection > menu->numitems) menu->selection = menu->numitems;
   if(menu->selection > menu->scroll+(menu->numitems>itemsHeight ? itemsHeight : menu->numitems))
@@ -43,11 +51,14 @@ int doMenu(Menu* menu, MenuItemIcon* icontable) {
   
   while(1) {
     if(menu->statusText != NULL) DefineStatusMessage(menu->statusText, 1, 0, 0);
+    else if (showTitle)
+      // Clear stale subtitle text even when the new menu has no subtitle.
+      drawRectangle(0, 0, LCD_WIDTH_PX, 24, COLOR_WHITE);
     // Clear the area of the screen we are going to draw on
     if(0 == menu->pBaRtR)
-      drawRectangle(18*(menu->startX-1), 24*(menu->miniMiniTitle ? itemsStartY:menu->startY),
+      drawRectangle(18*(menu->startX-1), 24*itemsStartY,
                     18*menu->width+(menu->scrollout || menu->width == 21 ?6:0),
-                    24*menu->height-(menu->miniMiniTitle ? 24:0), COLOR_WHITE);
+                    24*itemsHeight, COLOR_WHITE);
     if (menu->numitems>0) {
       for(int curitem=menu->scroll;
           menu->scroll > curitem-itemsHeight && curitem < menu->numitems;
@@ -71,6 +82,10 @@ int doMenu(Menu* menu, MenuItemIcon* icontable) {
                                (menu->width == 21 ? 1 : 0) -
                                MB_ElementCount((char*)displayText) -
                                (menu->type == MENUTYPE_MULTISELECT ? 2 : 0);
+          if (fillerRequired < 0) fillerRequired = 0;
+          int remaining = (int)sizeof(menuitemarr) - 1 -
+                          (int)(menuitem - menuitemarr);
+          if (fillerRequired > remaining) fillerRequired = remaining;
           for(int i = 0; i < fillerRequired; i++) {
             *menuitem = ' ';
             menuitem++;
@@ -157,9 +172,10 @@ int doMenu(Menu* menu, MenuItemIcon* icontable) {
         mPrintXY(menu->startX, menu->startY, menu->title, TEXT_MODE_TRANSPARENT_BACKGROUND,
                  menu->titleColor);
       if(menu->subtitle != NULL) {
-        int textX=(MB_ElementCount(menu->title)+menu->startX-1)*18+10, textY=6;
-        PrintMini(&textX, &textY, menu->subtitle, 0, 0xFFFFFFFF, 0, 0,
-                  COLOR_BLACK, COLOR_WHITE, 1, 0);
+        const char* localizedTitle = localizeText(menu->title);
+        int textX=(MB_ElementCount((char*)localizedTitle)+menu->startX-1)*18+10, textY=6;
+        mPrintMini(&textX, &textY, menu->subtitle, 0, 0xFFFFFFFF, 0, 0,
+                   COLOR_BLACK, COLOR_WHITE, 1, 0);
       }
     }
     if(menu->darken) {

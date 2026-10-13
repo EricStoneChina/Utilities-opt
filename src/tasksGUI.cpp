@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <alloca.h>
 
 #include "tasksGUI.hpp"
 #include "menuGUI.hpp"
@@ -20,8 +19,11 @@
 #include "calendarProvider.hpp"
 #include "calendarGUI.hpp"
 #include "constantsProvider.hpp"
+#include "storageProvider.hpp"
 
 void viewTasks() {
+  StorageGuard storageGuard = {0};
+  storageOperationBegin(&storageGuard);
   Menu menu;
   
   menu.scrollout=1;
@@ -31,6 +33,7 @@ void viewTasks() {
   menu.title = (char*)"Tasks";
   menu.returnOnRight = 1;
   while(viewTasksChild(&menu));
+  storageOperationEnd(&storageGuard);
 }
 
 int viewTasksChild(Menu* menu) {

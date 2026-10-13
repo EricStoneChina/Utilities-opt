@@ -20,8 +20,10 @@
 #include "keyboardProvider.hpp"
 #include "timeProvider.hpp"
 #include "settingsProvider.hpp"
+#include "storageProvider.hpp"
 
 void firstRunWizard() {
+  StorageScope storageScope;
   setmGetKeyMode(MGETKEY_MODE_RESTRICT_SETTINGS);
   Bdisp_AllClr_VRAM();
   DrawFrame(COLOR_WHITE);

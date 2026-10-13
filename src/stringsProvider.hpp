@@ -25,6 +25,7 @@ void stringToMini(char* dest, const char* orig);
 int base32_decode(const unsigned char *encoded, unsigned char *result, int size);
 int base32_validate(const char* string);
 void itoa_zeropad(int n, char* buffer, int digits);
+void formatHex32(char buffer[9], unsigned int value);
 
 // UI localization. Returned Chinese strings use the calculator's GB18030
 // byte encoding but do not include the PrintXY mode prefix.

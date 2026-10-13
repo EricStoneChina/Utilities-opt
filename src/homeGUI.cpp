@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <alloca.h>
 
 #include "homeGUI.hpp"
 #include "menuGUI.hpp"
@@ -32,6 +31,10 @@
 #include "calendarGUI.hpp"
 #include "toolsGUI.hpp"
 #include "memsysGUI.hpp"
+#include "diagnosticsGUI.hpp"
+#include "appGUI.hpp"
+#include "performanceGUI.hpp"
+#include "linkProvider.hpp"
 #include "lockGUI.hpp"
 #include "fileGUI.hpp"
 #include "editorGUI.hpp"
@@ -45,7 +48,14 @@ void homeScreen(int isLocked) {
   // find the registered username, if any:
   char* username = NULL;
   char* organization = NULL;
-  if(isLocked && getSetting(SETTING_LOCK_USERNAME)) {
+  /*
+   * The registered-user table is an undocumented legacy layout.  Do not
+   * touch it on CG50 or on an unknown model; the lock screen remains usable
+   * without displaying the optional registry fields.
+   */
+  int hardwareModel = getHardwareModel();
+  if(isLocked && getSetting(SETTING_LOCK_USERNAME) &&
+     (hardwareModel == 1 || hardwareModel == 2)) {
     char* flagpointer = (char*)0x80BE0000;
     while(*flagpointer == 0x0F) {
       if(*(flagpointer+0x2C) != '\0') {
@@ -367,17 +377,24 @@ void toolsMenu(int* pane_keycache) {
 void memsysMenu(int* pane_keycache) {
   drawFkeyPopup(4, (char*)"Memory & System");
   
-  MenuItem menuitems[6];
+  MenuItem menuitems[13];
   menuitems[0].text = (char*)"Device dashboard";
-  menuitems[1].text = (char*)"File manager";
-  menuitems[2].text = (char*)"Memory usage";
-  menuitems[3].text = (char*)"Function key color";
-  menuitems[4].text = (char*)"System information";
-  menuitems[5].text = (char*)"Add-In manager";
+  menuitems[1].text = (char*)"Interface diagnostics";
+  menuitems[2].text = (char*)"Application audit";
+  menuitems[3].text = (char*)"Screen tools";
+  menuitems[4].text = (char*)"Performance lab";
+  menuitems[5].text = (char*)"Native system settings";
+  menuitems[6].text = (char*)"Configuration backup";
+  menuitems[7].text = (char*)"File manager";
+  menuitems[8].text = (char*)"Memory usage";
+  menuitems[9].text = (char*)"Function key color";
+  menuitems[10].text = (char*)"System information";
+  menuitems[11].text = (char*)"Link transfer";
+  menuitems[12].text = (char*)"Add-In manager";
   
   Menu menu;
   menu.items=menuitems;
-  menu.numitems = 5 + !!getSetting(SETTING_SHOW_ADVANCED);
+  menu.numitems = 12 + !!getSetting(SETTING_SHOW_ADVANCED);
   menu.width=19;
   menu.height=4;
   menu.startX=2;
@@ -392,11 +409,18 @@ void memsysMenu(int* pane_keycache) {
         DrawFrame(COLOR_WHITE);
         switch(menu.selection) {
           case 1: deviceDashboard(); break;
-          case 2: fileManager(); break;
-          case 3: memoryCapacityScreen(); break;
-          case 4: changeFKeyColor(); break;
-          case 5: systemInfo(); break;
-          case 6: addinManager(); break;
+          case 2: interfaceDiagnostics(); break;
+          case 3: applicationAudit(); break;
+          case 4: screenTools(); break;
+          case 5: performanceLab(); break;
+          case 6: nativeSystemSettings(); break;
+          case 7: configurationManager(); break;
+          case 8: fileManager(); break;
+          case 9: memoryCapacityScreen(); break;
+          case 10: changeFKeyColor(); break;
+          case 11: systemInfo(); break;
+          case 12: linkCenter(); break;
+          case 13: addinManager(); break;
         }
         return;
       case KEY_CTRL_F6:

@@ -16,6 +16,7 @@
 #include "homeGUI.hpp"
 #include "menuGUI.hpp"
 #include "textGUI.hpp"
+#include "lockGUI.hpp"
 #include "keyboardProvider.hpp"
 #include "graphicsProvider.hpp"
 #include "lockProvider.hpp"
@@ -24,6 +25,8 @@
 #include "timeProvider.hpp"
 #include "settingsProvider.hpp"
 #include "hardwareProvider.hpp"
+#include "platformProvider.hpp"
+#include "diagnosticsProvider.hpp"
 
 int passwordInput(int x, int y, unsigned char* buffer) {
   //returns: 0 on user abort (EXIT), 1 on EXE
@@ -144,31 +147,151 @@ int unlockCalc() {
 }
 
 extern jmp_buf utilities_return;
-int rettimer;
-int isKeyPressed(int basic_keycode)
-{
-  const unsigned short* keyboard_register = (unsigned short*)0xA44B0000;
-  unsigned short lastkey[8];
-  memcpy(lastkey, keyboard_register, sizeof(unsigned short)*8);
-  int row, col, word, bit;
-  row = basic_keycode%10;
-  col = basic_keycode/10-1;
-  word = row>>1;
-  bit = col + 8*(row&1);
-  return (0 != (lastkey[word] & 1<<bit));
+int rettimer = -1;
+static volatile int runMatActive = 0;
+static volatile int runMatReturnPending = 0;
+static volatile unsigned int runMatShiftSeen = 0;
+static volatile unsigned int runMatExitSeen = 0;
+static volatile unsigned int runMatF6Seen = 0;
+static volatile unsigned int runMatMenuSeen = 0;
+static unsigned int runMatLaunchCount = 0;
+static unsigned int runMatReturnCount = 0;
+static int runMatLastResult = RUNMAT_RESULT_NONE;
+static int runMatLastError = 0;
+static int runMatPreviousMenuReturnFlag = 1;
+
+static void stopRunMatTimer() {
+  int timer = rettimer;
+  rettimer = -1;
+  if (timer > 0) {
+    Timer_Stop(timer);
+    Timer_Deinstall(timer);
+    diagnosticsRecordEvent(DIAGNOSTIC_EVENT_TIMER_STOP, timer);
+  }
 }
+
+static void showRunMatError(int errorCode) {
+  Bdisp_AllClr_VRAM();
+  drawScreenTitle("Run-Mat unavailable");
+  if (errorCode == RUNMAT_ERROR_NO_CAPABILITY) {
+    multiPrintXY(2, 3, "This calculator model is not\n"
+                         "supported by the safe return path.",
+                  TEXT_MODE_TRANSPARENT_BACKGROUND, TEXT_COLOR_BLACK);
+  } else {
+    multiPrintXY(2, 3, "The return timer could not\n"
+                         "be installed. Run-Mat was not opened.",
+                  TEXT_MODE_TRANSPARENT_BACKGROUND, TEXT_COLOR_BLACK);
+  }
+  mPrintXY(2, 7, "Press EXIT to close", TEXT_MODE_TRANSPARENT_BACKGROUND,
+           TEXT_COLOR_BLACK);
+  int key;
+  do {
+    mGetKey(&key);
+  } while (key != KEY_CTRL_EXIT);
+}
+
 void returnToUtilitiesHandler() {
-  if(isKeyPressed(KEY_PRGM_EXIT) && isKeyPressed(KEY_PRGM_SHIFT)) { // Shift+Exit (simultaneously)
-    SetSetupSetting( (unsigned int)0x14, 0);
-    Timer_Stop(rettimer);
-    Timer_Deinstall(rettimer);
+  if(!runMatActive || runMatReturnPending) return;
+  const int shiftPressed = platformIsKeyPressed(KEY_PRGM_SHIFT);
+  const int exitPressed = platformIsKeyPressed(KEY_PRGM_EXIT);
+  const int f6Pressed = platformIsKeyPressed(KEY_PRGM_F6);
+  const int menuPressed = platformIsKeyPressed(KEY_PRGM_MENU);
+  if (shiftPressed) runMatShiftSeen = 1;
+  if (exitPressed) runMatExitSeen = 1;
+  if (f6Pressed) runMatF6Seen = 1;
+  if (menuPressed) runMatMenuSeen = 1;
+  /*
+   * The CG50 matrix must be sampled frequently; at 100 ms a short EXIT
+   * press is commonly missed.  Accept EXIT alone as the safe escape route,
+   * while retaining SHIFT+EXIT for compatibility with the old shortcut.
+   */
+  if (exitPressed || (runMatShiftSeen &&
+      (runMatExitSeen || runMatF6Seen || runMatMenuSeen))) {
+    runMatReturnPending = 1;
+    runMatActive = 0;
+    runMatLastResult = (runMatShiftSeen && runMatExitSeen) ?
+                       RUNMAT_RESULT_SHIFT_EXIT : RUNMAT_RESULT_EXIT;
     longjmp(utilities_return, 1);
   }
 }
+
 void openRunMat() {
-  rettimer = Timer_Install(0, returnToUtilitiesHandler, 100);
-  if (rettimer > 0) { Timer_Start(rettimer); }
+  if (!platformHasCapability(PLATFORM_CAP_RUNMAT)) {
+    runMatLastError = RUNMAT_ERROR_NO_CAPABILITY;
+    diagnosticsRecordError(runMatLastError, getHardwareModel());
+    showRunMatError(runMatLastError);
+    return;
+  }
+
+  if (runMatActive) return;
+  int timer = Timer_Install(0, returnToUtilitiesHandler, 10);
+  if (timer <= 0) {
+    runMatLastError = RUNMAT_ERROR_TIMER_INSTALL;
+    diagnosticsRecordError(runMatLastError, timer);
+    showRunMatError(runMatLastError);
+    return;
+  }
+
+  rettimer = timer;
+  runMatActive = 1;
+  runMatReturnPending = 0;
+  runMatShiftSeen = 0;
+  runMatExitSeen = 0;
+  runMatF6Seen = 0;
+  runMatMenuSeen = 0;
+  runMatLastError = 0;
+  runMatLastResult = RUNMAT_RESULT_NONE;
+  runMatPreviousMenuReturnFlag = GetGetkeyToMainFunctionReturnFlag();
+  // Keep the native Run-Mat loop from consuming the shortcut as a global
+  // return-to-main request. Our timer owns the return decision instead.
+  SetGetkeyToMainFunctionReturnFlag(0);
+  SetSetupSetting((unsigned int)0x14, 0);
+  runMatLaunchCount++;
+  diagnosticsRecordEvent(DIAGNOSTIC_EVENT_RUNMAT_ENTER, timer);
+  diagnosticsRecordEvent(DIAGNOSTIC_EVENT_TIMER_START, timer);
+  Timer_Start(rettimer);
   APP_RUNMAT(0,0);
+
+  /* Some OS revisions return from APP_RUNMAT normally.  Treat that path as
+   * a valid return and perform the same timer cleanup as the longjmp path. */
+  if (runMatActive) {
+    runMatLastResult = RUNMAT_RESULT_APP_RETURN;
+    runMatReturnCount++;
+    finalizeRunMatReturn();
+    diagnosticsRecordEvent(DIAGNOSTIC_EVENT_RUNMAT_RETURN,
+                           runMatLastResult);
+  }
+}
+
+void finalizeRunMatReturn() {
+  stopRunMatTimer();
+  runMatActive = 0;
+  if (runMatReturnPending) {
+    runMatReturnCount++;
+    diagnosticsRecordEvent(DIAGNOSTIC_EVENT_RUNMAT_RETURN,
+                           runMatLastResult);
+  }
+  runMatReturnPending = 0;
+  runMatShiftSeen = 0;
+  runMatExitSeen = 0;
+  runMatF6Seen = 0;
+  runMatMenuSeen = 0;
+  SetSetupSetting((unsigned int)0x14, 0);
+  SetGetkeyToMainFunctionReturnFlag(runMatPreviousMenuReturnFlag);
+  Cursor_SetFlashOff();
+  Bkey_ClrAllFlags();
+  resetFunctionKeyMappings();
+  Bdisp_EnableColor(1);
+}
+
+void getRunMatStatus(RunMatStatus* status) {
+  if (status == NULL) return;
+  status->active = runMatActive;
+  status->timerId = rettimer;
+  status->launchCount = runMatLaunchCount;
+  status->returnCount = runMatReturnCount;
+  status->lastResult = runMatLastResult;
+  status->lastError = runMatLastError;
 }
 void lockApp() {
   if (!getSetting(SETTING_ENABLE_LOCK))

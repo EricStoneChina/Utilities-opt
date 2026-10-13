@@ -31,21 +31,86 @@ jobs:
           "FXCGSDK=$($sdkRoot.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "$($sdkRoot.FullName)\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
+      - name: Reproduce CG50 icon sources
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\tools\generate-cg50-icons.ps1" -OutputDirectory "$env:GITHUB_WORKSPACE\assets\icons"
+          if (-not $?) { throw "CG50 icon generation failed" }
+          git -C "$env:GITHUB_WORKSPACE" diff --exit-code -- assets/icons/selected.png assets/icons/unselected.png
+
       - name: Build g3a
         shell: pwsh
         run: |
           & "$env:FXCGSDK\bin\make.exe" -C "$env:GITHUB_WORKSPACE" "FXCGSDK=$env:FXCGSDK"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Validate CG50 G3A format and icons
+        shell: pwsh
+        run: |
+          $validation = & "$env:GITHUB_WORKSPACE\tools\validate-g3a.ps1" -RootPath "$env:GITHUB_WORKSPACE"
+          $validationExitCode = $LASTEXITCODE
+          $validation | Tee-Object -FilePath "$env:GITHUB_STEP_SUMMARY"
+          if ($validationExitCode -ne 0) { exit $validationExitCode }
+
+      - name: Verify G3A parser regression guards
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\tools\g3a-parser-audit.ps1" -RootPath "$env:GITHUB_WORKSPACE"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify Run-Mat return invariants
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\tools\runmat-audit.ps1" -RootPath "$env:GITHUB_WORKSPACE"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Run static performance audit
         shell: pwsh
         run: |
           $audit = & "$env:GITHUB_WORKSPACE\tools\perf-audit.ps1"
+          $auditExitCode = $LASTEXITCODE
           $audit | Tee-Object -FilePath "$env:GITHUB_STEP_SUMMARY"
+          if ($auditExitCode -ne 0) { exit $auditExitCode }
           if ($audit -match '\| alloca \| (?!0\b)') {
             throw "alloca was reintroduced into the source tree"
           }
           git -C "$env:GITHUB_WORKSPACE" diff --check
+
+      - name: Verify storage timer guards
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\tools\storage-audit.ps1"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify platform capability guards
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\tools\platform-audit.ps1" -RootPath "$env:GITHUB_WORKSPACE"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify legacy clock safety guard
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\tools\clock-safety-audit.ps1" -RootPath "$env:GITHUB_WORKSPACE"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify Chinese localization coverage
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\tools\localization-audit.ps1" -RootPath "$env:GITHUB_WORKSPACE"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify UI and file-write safety invariants
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\tools\ui-safety-audit.ps1" -RootPath "$env:GITHUB_WORKSPACE"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify screen tool coverage
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\tools\screen-tools-audit.ps1" -RootPath "$env:GITHUB_WORKSPACE"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Report artifact size
         shell: pwsh

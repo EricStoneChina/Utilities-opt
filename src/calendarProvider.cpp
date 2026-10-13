@@ -12,13 +12,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <alloca.h>
 
 #include "calendarProvider.hpp"
 #include "constantsProvider.hpp"
 #include "timeProvider.hpp"
 #include "stringsProvider.hpp"
 #include "fileProvider.hpp" 
+#include "storageProvider.hpp"
 
 struct CalendarFileBufferGuard {
   char* buffer;
@@ -256,6 +256,7 @@ void sortSimpleCalendarEvents(SimpleCalendarEvent events[], int count) {
 }
 
 int addEvent(CalendarEvent* calEvent, const char* folder, int secondCall) {
+  StorageScope storageScope;
   //Saves a calendar event on an existing calendar with specified file name.
   //If the specified file doesn't exist, it is created and the event is added to it.
   //Returns 0 on success, other values on error.
@@ -323,6 +324,7 @@ int addEvent(CalendarEvent* calEvent, const char* folder, int secondCall) {
 
 int replaceEventFile(EventDate *startdate, CalendarEvent* newEvents,
                      const char* folder, int count) {
+  StorageScope storageScope;
   /* This basically deletes the events of startdate and replaces them with newEvents.
    * Allows for a way to edit an event on a day, when all the events for that day are in memory
    * (including the edited one).
@@ -371,6 +373,7 @@ int replaceEventFile(EventDate *startdate, CalendarEvent* newEvents,
 
 void removeEvent(EventDate *startdate, CalendarEvent* events,
                  const char* folder, int count, int calEventPos) {
+  StorageScope storageScope;
   /* removes SMEM event starting on startdate.
    * events: array from where to remove the event
    * count: current number of events in file (before deletion)
@@ -391,6 +394,7 @@ void removeEvent(EventDate *startdate, CalendarEvent* events,
 }
 
 void removeDay(EventDate* date, const char* folder) {
+  StorageScope storageScope;
   //remove all SMEM events for the day
   unsigned short pFile[MAX_FILENAME_SIZE];
   eventDateToFilename(date, pFile, folder);
@@ -399,6 +403,7 @@ void removeDay(EventDate* date, const char* folder) {
 
 int getEvents(EventDate* startdate, const char* folder, CalendarEvent* calEvents, int limit,
               SimpleCalendarEvent* simpleCalEvents) {
+  StorageScope storageScope;
   /* reads the storage memory searching for events starting on specified date.
    * folder is where events will be searched for (useful for multiple calendar support)
    * if calEvents is not NULL:
@@ -517,6 +522,7 @@ int getEventCountsForMonthHelper(EventDate* date, int* busydays) {
   return count;
 }
 void getEventCountsForMonth(int year, int month, int* dbuffer, int* busydays) {
+  StorageScope storageScope;
   memset(dbuffer, 0, 32*sizeof(int));
   memset(busydays, 0, 32*sizeof(int));
 
@@ -527,7 +533,7 @@ void getEventCountsForMonth(int year, int month, int* dbuffer, int* busydays) {
   sprintf(buffer, CALENDARFOLDER"\\%d%s%d*.pce", year, month < 10 ? "0" : "", month);
   
   file_type_t fileinfo;
-  int findhandle;
+  int findhandle = -1;
   Bfile_StrToName_ncpy(path, buffer, MAX_FILENAME_SIZE+1);
   int ret = Bfile_FindFirst_NON_SMEM((const char*)path, &findhandle, (char*)found, &fileinfo);
   while(!ret) {
@@ -547,7 +553,7 @@ void getEventCountsForMonth(int year, int month, int* dbuffer, int* busydays) {
     }
     ret = Bfile_FindNext_NON_SMEM(findhandle, (char*)found, (char*)&fileinfo);
   }
-  Bfile_FindClose(findhandle);
+  if (findhandle >= 0) Bfile_FindClose(findhandle);
 }
 
 int SearchHelper(EventDate* date, SimpleCalendarEvent* calEvents,
@@ -594,6 +600,7 @@ int searchEventsOnDay(EventDate* date, const char* folder, SimpleCalendarEvent* 
 
 int searchEventsOnYearOrMonth(int y, int m, const char* folder, SimpleCalendarEvent* calEvents,
                               char* needle, int limit) {
+  StorageScope storageScope;
   // if m is zero, will search on year y
   // limit is the maximum number of results
   int index = 0;
@@ -613,7 +620,7 @@ int searchEventsOnYearOrMonth(int y, int m, const char* folder, SimpleCalendarEv
   if(y < 10) correctLen--;
   
   file_type_t fileinfo;
-  int findhandle;
+  int findhandle = -1;
   Bfile_StrToName_ncpy(path, buffer, MAX_FILENAME_SIZE+1);
   int ret = Bfile_FindFirst_NON_SMEM((const char*)path, &findhandle, (char*)found, &fileinfo);
   while(!ret) {
@@ -650,7 +657,7 @@ int searchEventsOnYearOrMonth(int y, int m, const char* folder, SimpleCalendarEv
           if(matches > 0) {
             index += matches;
             if(index >= limit) {
-              Bfile_FindClose(findhandle);
+              if (findhandle >= 0) Bfile_FindClose(findhandle);
               return index;
             }
           }
@@ -659,7 +666,7 @@ int searchEventsOnYearOrMonth(int y, int m, const char* folder, SimpleCalendarEv
     }
     ret = Bfile_FindNext_NON_SMEM(findhandle, (char*)found, (char*)&fileinfo);
   }
-  Bfile_FindClose(findhandle);
+  if (findhandle >= 0) Bfile_FindClose(findhandle);
   return index;
 }
 
@@ -672,6 +679,7 @@ void fixEventString(unsigned char* asrc, int field_length, int max, int* len, in
 }
 
 void repairEventFile(char* name, const char* folder, int* checkedevents, int* problemsfound) {
+  StorageScope storageScope;
   /* Repairs an event file when possible, or deletes it straight away if it has major problems.
    * Makes A LOT of assumptions about the format of files and their names, so one must check that
    * files are still taken as valid by this function after making changes to the file/storage

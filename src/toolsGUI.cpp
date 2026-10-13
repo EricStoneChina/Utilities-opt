@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <alloca.h>
 #include <ctype.h>
 
 #include "toolsGUI.hpp"
@@ -30,6 +29,7 @@
 #include "selectorGUI.hpp"
 #include "timeGUI.hpp"
 #include "fileGUI.hpp"
+#include "storageProvider.hpp"
 
 // Balance manager:
 
@@ -445,26 +445,32 @@ int changeWalletScreen(char* currentWallet) {
     // make the buffer
     strcpy(buffer, BALANCEFOLDER"\\*");
     
-    file_type_t fileinfo;
-    int findhandle;
-    Bfile_StrToName_ncpy(path, buffer, MAX_FILENAME_SIZE+1);
-    int ret = Bfile_FindFirst_NON_SMEM((const char*)path, &findhandle, (char*)found, &fileinfo);
     int i = 0;
-    while(!ret) {
-      Bfile_NameToStr_ncpy(buffer, found, MAX_FILENAME_SIZE+1);
-      if(fileinfo.fsize == 0 &&
-         !(strcmp((char*)buffer, "..") == 0 || strcmp((char*)buffer, ".") == 0)) { // find folders
-        strcpy(wallets[i], buffer);
-        items[i].text = wallets[i];
-        i++;
-        if(!strcmp(buffer, currentWalletNice)) menu.selection = i;
-        if(i == MAX_WALLETS) break;
+    {
+      StorageScope storageScope;
+      file_type_t fileinfo;
+      int findhandle = -1;
+      Bfile_StrToName_ncpy(path, buffer, MAX_FILENAME_SIZE+1);
+      int ret = Bfile_FindFirst_NON_SMEM((const char*)path, &findhandle,
+                                         (char*)found, &fileinfo);
+      while(!ret) {
+        Bfile_NameToStr_ncpy(buffer, found, MAX_FILENAME_SIZE+1);
+        if(fileinfo.fsize == 0 &&
+           !(strcmp((char*)buffer, "..") == 0 ||
+             strcmp((char*)buffer, ".") == 0)) { // find folders
+          strcpy(wallets[i], buffer);
+          items[i].text = wallets[i];
+          i++;
+          if(!strcmp(buffer, currentWalletNice)) menu.selection = i;
+          if(i == MAX_WALLETS) break;
+        }
+        ret = Bfile_FindNext_NON_SMEM(findhandle, (char*)found,
+                                      (char*)&fileinfo);
       }
-      ret = Bfile_FindNext_NON_SMEM(findhandle, (char*)found, (char*)&fileinfo);
+      if (findhandle >= 0) Bfile_FindClose(findhandle);
     }
     menu.items = items;
     menu.numitems = i;
-    Bfile_FindClose(findhandle);
     drawFkeyLabels(0x000F, 0x0186, 0x0188, 0x0038, 0, 0); // SELECT, NEW, RENAME, DELETE
     int res = doMenu(&menu);
     switch(res) {
@@ -508,7 +514,10 @@ int changeWalletScreen(char* currentWallet) {
             unsigned short path[MAX_FILENAME_SIZE+1];
             strcpy(buffer, BALANCEFOLDER"\\Wallet");
             Bfile_StrToName_ncpy(path, buffer, MAX_FILENAME_SIZE);
-            Bfile_DeleteEntry(path);
+            {
+              StorageScope storageScope;
+              Bfile_DeleteEntry(path);
+            }
             return 1;
           }
           if(!strcmp(currentWallet, buffer)) {
@@ -561,10 +570,13 @@ int renameWalletScreen(char* wallet, char* newWallet) {
     int res = doTextInput(&input);
     if (res==INPUT_RETURN_EXIT) return 0; // user aborted
     else if (res==INPUT_RETURN_CONFIRM) {
-      char fwallet[MAX_FILENAME_SIZE];
-      walletNameToPath(newWallet, newname);
-      walletNameToPath(fwallet, wallet);
-      renameFile(fwallet, newWallet);
+          char fwallet[MAX_FILENAME_SIZE];
+          walletNameToPath(newWallet, newname);
+          walletNameToPath(fwallet, wallet);
+          {
+            StorageScope storageScope;
+            renameFile(fwallet, newWallet);
+          }
       return 1;
     }
   }
@@ -662,27 +674,38 @@ void passwordGenerator() {
         int ntry = 0;
         while(ntry < 2) {
           ntry++;
-          int BCEres = Bfile_CreateEntry_OS(pFile, CREATEMODE_FILE, &size);
-          if(BCEres >= 0) {
-            int hFile = Bfile_OpenFile_OS(pFile, READWRITE, 0); // Get handle
-            if(hFile >= 0) {
-              char password[35];
-              char line[37];
-              for(int i = 0; i < sel.value; i++) {
-                generateRandomString(password, length, items[1].value, items[2].value,
-                                     items[3].value, items[4].value, items[5].value, &seed);
-                sprintf(line, "%s\r\n", password);
-                Bfile_WriteFile_OS(hFile, line, length+2);
+          int BCEres;
+          {
+            StorageScope storageScope;
+            BCEres = Bfile_CreateEntry_OS(pFile, CREATEMODE_FILE, &size);
+            if(BCEres >= 0) {
+              int hFile = Bfile_OpenFile_OS(pFile, READWRITE, 0); // Get handle
+              if(hFile >= 0) {
+                char password[35];
+                char line[37];
+                for(int i = 0; i < sel.value; i++) {
+                  generateRandomString(password, length, items[1].value,
+                                       items[2].value, items[3].value,
+                                       items[4].value, items[5].value, &seed);
+                  sprintf(line, "%s\r\n", password);
+                  Bfile_WriteFile_OS(hFile, line, length+2);
+                }
+                Bfile_CloseFile_OS(hFile);
+              } else {
+                AUX_DisplayErrorMessage(0x2B);
               }
-              Bfile_CloseFile_OS(hFile);
-            } else AUX_DisplayErrorMessage(0x2B);
+            }
+          }
+          if(BCEres >= 0) {
             break;
           } else if(ntry < 2) {
             // File creation probably failed due to the presence of a file with the same name
-            if(overwriteFilePrompt(newfilename))
+            if(overwriteFilePrompt(newfilename)) {
+              StorageScope storageScope;
               Bfile_DeleteEntry(pFile);
-            else
+            } else {
               break;
+            }
           } else AUX_DisplayErrorMessage(0x2B);
         }
         break;

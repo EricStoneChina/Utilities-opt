@@ -47,7 +47,7 @@ $keyCount = Get-MatchCount '\b(GetKey|GetKeyWait_OS)\s*\('
 $sprintfCount = Get-MatchCount '\bsprintf\s*\('
 $strcpyCount = Get-MatchCount '\bstrcpy\s*\('
 $strcatCount = Get-MatchCount '\bstrcat\s*\('
-$largeStackPattern = '\b(?:char|unsigned\s+char|unsigned\s+short|short|int|long|textElement|MenuItem|CalendarEvent|SimpleCalendarEvent|AddIn|Transaction|totp)\s+[A-Za-z_][A-Za-z0-9_]*\s*\[[^\]]*(?:[0-9]{4,}|TEXT_BUFFER_SIZE|MAX_EVENT_FILESIZE|numelements|count\s*\*)[^\]]*\]'
+$largeStackPattern = '(?<!static\s)(?<!unsigned\s)\b(?:(?:unsigned\s+)?(?:char|short|int|long)|textElement|MenuItem|CalendarEvent|SimpleCalendarEvent|AddIn|Transaction|totp)\s+[A-Za-z_][A-Za-z0-9_]*\s*\[[^\]]*(?:[0-9]{4,}|TEXT_BUFFER_SIZE|MAX_EVENT_FILESIZE|numelements|count\s*\*)[^\]]*\]'
 $largeStackArrays = @(
   foreach ($file in $sourceFiles) {
     Select-String -LiteralPath $file.FullName -Pattern $largeStackPattern |
@@ -60,6 +60,10 @@ $largeStackArrays = @(
       }
   }
 )
+
+$fileProviderPath = Join-Path $RootPath "src\fileProvider.cpp"
+$fileProviderText = Get-Content -LiteralPath $fileProviderPath -Raw
+$largeFileStackBuffer = $fileProviderText -match 'unsigned\s+char\s+in_buf\s*\[\s*FILE_COMPORIGBUF'
 
 Write-Output "# Utilities static performance audit"
 Write-Output ""
@@ -82,6 +86,7 @@ Write-Output "| sprintf | $sprintfCount |"
 Write-Output "| strcpy | $strcpyCount |"
 Write-Output "| strcat | $strcatCount |"
 Write-Output "| large stack array candidates | $($largeStackArrays.Count) |"
+Write-Output "| large compression stack buffer | $(if ($largeFileStackBuffer) { 1 } else { 0 }) |"
 
 Write-Output ""
 Write-Output "## Largest source files"
@@ -110,7 +115,12 @@ Write-Output ""
 if ($largeStackArrays.Count -eq 0) {
   Write-Output "- none detected"
 } else {
-  foreach ($item in $largeStackArrays) {
+foreach ($item in $largeStackArrays) {
     Write-Output "- ``$($item.Path):$($item.Line)``: $($item.Text)"
   }
 }
+if ($largeFileStackBuffer) {
+  Write-Output ""
+  Write-Output "- ``src\fileProvider.cpp`` still declares an input buffer sized by FILE_COMPORIGBUF on the stack"
+}
+exit 0

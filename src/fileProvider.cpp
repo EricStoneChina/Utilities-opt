@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <alloca.h>
 
 #include "constantsProvider.hpp"
 #include "graphicsProvider.hpp"
@@ -21,6 +20,7 @@
 #include "menuGUI.hpp"
 #include "fileProvider.hpp"
 #include "fileGUI.hpp"
+#include "storageProvider.hpp"
 extern "C" {
 #include "heatshrink_encoder.h"
 #include "heatshrink_decoder.h"
@@ -78,6 +78,7 @@ void sortFiles(File* data, int size) {
 }
 
 int getFiles(File* files, const char* basepath, int* count) {
+  StorageScope storageScope;
   /* searches storage memory for folders and files, puts their count in int* count
    * If File* files is NULL, function will only count files.
    * If it is not null, MenuItem* menuitems will also be updated
@@ -93,7 +94,7 @@ int getFiles(File* files, const char* basepath, int* count) {
   
   *count = 0;
   file_type_t fileinfo;
-  int findhandle;
+  int findhandle = -1;
   Bfile_StrToName_ncpy(path, buffer, MAX_FILENAME_SIZE+1);
   int ret = Bfile_FindFirst_NON_SMEM((const char*)path, &findhandle, (char*)found, &fileinfo);
   while(!ret) {
@@ -112,12 +113,12 @@ int getFiles(File* files, const char* basepath, int* count) {
       *count=*count+1;
     }
     if (*count==MAX_ITEMS_IN_DIR) {
-      Bfile_FindClose(findhandle);
+      if (findhandle >= 0) Bfile_FindClose(findhandle);
       if(files != NULL) sortFiles(files, *count);
       return GETFILES_MAX_FILES_REACHED; // Don't find more files, the array is full. 
     } else ret = Bfile_FindNext_NON_SMEM(findhandle, (char*)found, (char*)&fileinfo);
   }
-  Bfile_FindClose(findhandle);
+  if (findhandle >= 0) Bfile_FindClose(findhandle);
   if(*count > 1 && files != NULL) sortFiles(files, *count);
   return GETFILES_SUCCESS;
 }
@@ -128,6 +129,7 @@ char* SearchStringMatch(const char* s1, const char* s2, int matchCase) {
 }
 int searchForFiles(File* files, const char* basepath, const char* needle, int searchOnFilename,
   int searchOnContents, int searchRecursively, int matchCase, int* count, int isRecursiveCall) {
+  StorageScope storageScope;
   /* searches storage memory for folders and files containing needle in the filename or contents,
    * puts their count in int* count
    * if File* files is NULL, function will only count search results.
@@ -147,7 +149,7 @@ int searchForFiles(File* files, const char* basepath, const char* needle, int se
   
   if(!isRecursiveCall) *count = 0;
   file_type_t fileinfo;
-  int findhandle;
+  int findhandle = -1;
   Bfile_StrToName_ncpy(path, buffer, MAX_FILENAME_SIZE+1);
   int ret = Bfile_FindFirst_NON_SMEM((const char*)path, &findhandle, (char*)found, &fileinfo);
   int abortkey = 0;
@@ -215,11 +217,11 @@ int searchForFiles(File* files, const char* basepath, const char* needle, int se
       abortkey = PRGM_GetKey();
     }
     if (*count==MAX_ITEMS_IN_DIR) {
-      Bfile_FindClose(findhandle);
+      if (findhandle >= 0) Bfile_FindClose(findhandle);
       return GETFILES_MAX_FILES_REACHED; // Don't find more files, the array is full. 
     } else ret = Bfile_FindNext_NON_SMEM(findhandle, (char*)found, (char*)&fileinfo);
   }
-  Bfile_FindClose(findhandle);
+  if (findhandle >= 0) Bfile_FindClose(findhandle);
   if(abortkey == KEY_PRGM_ACON) return GETFILES_USER_ABORTED;
   // now that all handles are closed, take care of the recursive search, if it was requested
   if((0x881E0000 - (int)GetStackPtr()) < 350000) { // if stack usage is below 350000 bytes...
@@ -242,6 +244,7 @@ int searchForFiles(File* files, const char* basepath, const char* needle, int se
 }
 
 void deleteFiles(File* files, Menu* menu) {
+  StorageScope storageScope;
   /* files: the array (list) of files to perform operations in.
    * NOT the files to delete (this will only delete selected files)
    * menu: the menu of the current file manager window. used to check which files are selected,
@@ -269,6 +272,7 @@ void deleteFiles(File* files, Menu* menu) {
 }
 
 void renameFile(char* old, char* newf) {
+  StorageScope storageScope;
   if(!strcmp(old, newf)) return;
   unsigned short orig[MAX_FILENAME_SIZE+1];
   unsigned short dest[MAX_FILENAME_SIZE+1];
@@ -290,6 +294,7 @@ char* filenameToName(char* filename) {
 }
 
 void copyFile(char* oldfilename, char* newfilename) {
+  StorageScope storageScope;
   if(!strcmp(newfilename, oldfilename) || stringEndsInG3A(newfilename)) {
     //trying to copy over the original file, or this is a g3a file (which we can't "touch")
     return;
@@ -306,8 +311,10 @@ void copyFile(char* oldfilename, char* newfilename) {
     //returned error: couldn't open file to copy.
     return; //skip this file
   }
-  size_t copySize = Bfile_GetFileSize_OS(hOldFile);
+  int sourceSize = Bfile_GetFileSize_OS(hOldFile);
   Bfile_CloseFile_OS(hOldFile); // close for now
+  if (sourceSize < 0) return;
+  size_t copySize = (size_t)sourceSize;
 
   // Get handle for the destination file, just to check for its presence
   int hNewFile = Bfile_OpenFile_OS(newfilenameshort, READWRITE, 0);
@@ -343,23 +350,53 @@ void copyFile(char* oldfilename, char* newfilename) {
       return;
     }
     
-    //File to copy is open, destination file is created and open.
+    // File to copy is open, destination file is created and open.  Keep this
+    // buffer on the heap: a 24 KB local array is enough to exhaust the small
+    // add-in stack on a CG50, especially when copyFolder() is nested.
 #define FILE_COPYBUFFER 24576
-    int rwsize;
-    do {
-      unsigned char copybuffer[FILE_COPYBUFFER+5] = "";
+    unsigned char* copybuffer =
+        (unsigned char*)malloc(FILE_COPYBUFFER);
+    int rwsize = 0;
+    int writePosition = 0;
+    int copyFailed = copybuffer == NULL;
+    if (!copyFailed && (Bfile_SeekFile_OS(hOldFile, 0) < 0 ||
+                        Bfile_SeekFile_OS(hNewFile, 0) < 0)) {
+      copyFailed = 1;
+    }
+    while (!copyFailed) {
       rwsize = Bfile_ReadFile_OS(hOldFile, copybuffer, FILE_COPYBUFFER, -1);
-      if(rwsize > 0) Bfile_WriteFile_OS(hNewFile, copybuffer, rwsize);
-    } while(rwsize > 0);
-    //done copying, close files.
+      if (rwsize < 0) {
+        copyFailed = 1;
+        break;
+      }
+      if (rwsize == 0) break;
+
+      if (!storageWriteFile(hNewFile, copybuffer, rwsize)) {
+        copyFailed = 1;
+        break;
+      }
+      writePosition += rwsize;
+    }
+    if (!copyFailed && (size_t)writePosition != copySize) copyFailed = 1;
+
+    // Done copying, close files and release the heap buffer before any
+    // recovery path.  Never publish a partial temporary file.
     Bfile_CloseFile_OS(hOldFile);
     Bfile_CloseFile_OS(hNewFile);
-    // now rename the temp file to the correct file name
-    Bfile_RenameEntry(tempfilenameshort , newfilenameshort);
+    if (copybuffer != NULL) free(copybuffer);
+    if (copyFailed) {
+      Bfile_DeleteEntry(tempfilenameshort);
+      return;
+    }
+
+    // Now rename the verified temporary file to the correct file name.
+    if (Bfile_RenameEntry(tempfilenameshort, newfilenameshort) < 0)
+      Bfile_DeleteEntry(tempfilenameshort);
   } //else: create failed, but we're going to skip anyway
 }
 
 void copyFolder(char* oldfilename, char* newfilename) {
+  StorageScope storageScope;
   // create destination folder:
   unsigned short newfilenameshort[0x10A];
   Bfile_StrToName_ncpy(newfilenameshort, newfilename, 0x10A);
@@ -378,7 +415,7 @@ void copyFolder(char* oldfilename, char* newfilename) {
   strcat(buffer, "\\*");
   
   file_type_t fileinfo;
-  int findhandle;
+  int findhandle = -1;
   Bfile_StrToName_ncpy(path, buffer, MAX_FILENAME_SIZE+1);
   int ret = Bfile_FindFirst_NON_SMEM((const char*)path, &findhandle, (char*)found, &fileinfo);
   while(!ret) {
@@ -408,7 +445,7 @@ void copyFolder(char* oldfilename, char* newfilename) {
     }
     ret = Bfile_FindNext_NON_SMEM(findhandle, (char*)found, (char*)&fileinfo);
   }
-  Bfile_FindClose(findhandle);
+  if (findhandle >= 0) Bfile_FindClose(findhandle);
   // now that all handles are closed, copy the items we found
   // copy only if there's enough free stack
   if((0x881E0000 - (int)GetStackPtr()) < 350000) { // if stack usage is below 350000 bytes...
@@ -429,6 +466,7 @@ void copyFolder(char* oldfilename, char* newfilename) {
 }
 
 void pasteClipboard(File* clipboard, char* browserbasepath, int itemsInClipboard) {
+  StorageScope storageScope;
   //this copies or moves to browserbasepath the items in the clipboard.
   //when the action field of a clipboard item is 0, the item will be moved.
   //when the action field is 1, the item will be copied.
@@ -491,6 +529,7 @@ int stringEndsInJPG(char* string) {
 }
 
 void createFolderRecursive(const char* folder) {
+  StorageScope storageScope;
   // creates folder \\fls0\Fol1\Abc even if \\fls0\Fol1 doesn't exist yet
   // despite the name, this is not a recursive function.
   int l = strlen(folder);
@@ -531,20 +570,25 @@ static int encoder_sink_read(int writehandle, heatshrink_encoder *hse, uint8_t *
   do {
     if (data_sz > 0) {
       sres = heatshrink_encoder_sink(hse, &data[sunk], data_sz - sunk, &sink_sz);
-      if (sres < 0) { return 1; }
+      if (sres < 0) { return -1; }
       sunk += sink_sz;
     }
     
     do {
       pres = heatshrink_encoder_poll(hse, out_buf, out_sz, &poll_sz);
-      if (pres < 0) { return 1; }
-      if(writehandle >= 0) Bfile_WriteFile_OS(writehandle, out_buf, poll_sz);
-      else if (final_sz!=NULL) *final_sz = *final_sz+poll_sz;
+      if (pres < 0) { return -1; }
+      if (writehandle >= 0) {
+        if (poll_sz > 0) {
+          if (!storageWriteFile(writehandle, out_buf, (int)poll_sz)) return -1;
+        }
+      } else if (final_sz != NULL) {
+        *final_sz = *final_sz + poll_sz;
+      }
     } while (pres == HSER_POLL_MORE);
     
     if (poll_sz == 0 && data_sz == 0) {
       fres = heatshrink_encoder_finish(hse);
-      if (fres < 0) { return 1; }
+      if (fres < 0) { return -1; }
       if (fres == HSER_FINISH_DONE) { return 1; }
     }
   } while (sunk < data_sz);
@@ -567,19 +611,21 @@ static int decoder_sink_read(int writehandle, heatshrink_decoder *hsd, uint8_t *
   do {
     if (data_sz > 0) {
       sres = heatshrink_decoder_sink(hsd, &data[sunk], data_sz - sunk, &sink_sz);
-      if (sres < 0) { return 1; }
+      if (sres < 0) { return -1; }
       sunk += sink_sz;
     }
 
     do {
       pres = heatshrink_decoder_poll(hsd, out_buf, out_sz, &poll_sz);
-      if (pres < 0) { return 1; }
-      Bfile_WriteFile_OS(writehandle, out_buf, poll_sz);
+      if (pres < 0) { return -1; }
+      if (poll_sz > 0) {
+        if (!storageWriteFile(writehandle, out_buf, (int)poll_sz)) return -1;
+      }
     } while (pres == HSDR_POLL_MORE);
     
     if (data_sz == 0 && poll_sz == 0) {
       fres = heatshrink_decoder_finish(hsd);
-      if (fres < 0) { return 1; }
+      if (fres < 0) { return -1; }
       if (fres == HSDR_FINISH_DONE) { return 1; }
     }
   } while (sunk < data_sz);
@@ -590,13 +636,20 @@ static int decoder_sink_read(int writehandle, heatshrink_decoder *hsd, uint8_t *
 static int measureFileCompression(int hOldFile, uint8_t* in_buf, size_t bufferSize,
                                   unsigned char windowsize, unsigned char lookahead,
                                   size_t* compressedSize) {
-  Bfile_SeekFile_OS(hOldFile, 0);
+  if (Bfile_SeekFile_OS(hOldFile, 0) < 0) return 1;
   heatshrink_encoder *hse = heatshrink_encoder_alloc(windowsize, lookahead);
   if(hse == NULL) return 1;
   *compressedSize = 0;
   while(1) {
-    unsigned int read_sz = Bfile_ReadFile_OS(hOldFile, in_buf, bufferSize, -1);
-    if(encoder_sink_read(-1, hse, in_buf, read_sz, compressedSize)) break;
+    int read_sz = Bfile_ReadFile_OS(hOldFile, in_buf, bufferSize, -1);
+    if (read_sz < 0) {
+      heatshrink_encoder_free(hse);
+      return 1;
+    }
+    if (encoder_sink_read(-1, hse, in_buf, (size_t)read_sz, compressedSize) < 0) {
+      heatshrink_encoder_free(hse);
+      return 1;
+    }
     if(!read_sz) break;
   }
   heatshrink_encoder_free(hse);
@@ -604,6 +657,7 @@ static int measureFileCompression(int hOldFile, uint8_t* in_buf, size_t bufferSi
 }
 
 void compressFile(char* oldfilename, char* newfilename, int action, int silent) {
+  StorageScope storageScope;
   // with action == 0, compresses. with action == 1, decompresses.
   // if silent is true, GUI is not touched.
   if(!strcmp(newfilename, oldfilename) ||
@@ -625,7 +679,12 @@ void compressFile(char* oldfilename, char* newfilename, int action, int silent) 
   unsigned char* compressionBuffer = NULL;
 #define FILE_COMPORIGBUF 24576
   if(!action) {
-    origfilesize = Bfile_GetFileSize_OS(hOldFile);
+    int originalFileSize = Bfile_GetFileSize_OS(hOldFile);
+    if (originalFileSize < 0) {
+      Bfile_CloseFile_OS(hOldFile);
+      return;
+    }
+    origfilesize = (unsigned int)originalFileSize;
     // so that we can write the original size to the compressed file header
 
     // test compression with different settings to find out which is best for this case
@@ -637,20 +696,34 @@ void compressFile(char* oldfilename, char* newfilename, int action, int silent) 
       return;
     }
     unsigned int sampleSize = origfilesize > FILE_COMPORIGBUF ? FILE_COMPORIGBUF : origfilesize;
-    Bfile_SeekFile_OS(hOldFile, 0);
-    unsigned int sampleRead = Bfile_ReadFile_OS(hOldFile, compressionBuffer, sampleSize, -1);
+    if (Bfile_SeekFile_OS(hOldFile, 0) < 0) {
+      Bfile_CloseFile_OS(hOldFile);
+      free(compressionBuffer);
+      return;
+    }
+    int sampleRead = Bfile_ReadFile_OS(hOldFile, compressionBuffer, sampleSize, -1);
+    if (sampleRead < 0) {
+      Bfile_CloseFile_OS(hOldFile);
+      free(compressionBuffer);
+      return;
+    }
     unsigned int smallestsize = 0;
     for(int i = 0; i < 5; i++) {
       heatshrink_encoder *hse = heatshrink_encoder_alloc(wsArray[i], laArray[i]);
       if (hse == NULL) { Bfile_CloseFile_OS(hOldFile); free(compressionBuffer); return; }
       unsigned int newsize = 0;
-      if(encoder_sink_read(-1, hse, compressionBuffer, sampleRead, &newsize)) {
+      if(encoder_sink_read(-1, hse, compressionBuffer, (size_t)sampleRead, &newsize) < 0) {
         heatshrink_encoder_free(hse);
         Bfile_CloseFile_OS(hOldFile);
         free(compressionBuffer);
         return;
       }
-      encoder_sink_read(-1, hse, compressionBuffer, 0, &newsize);
+      if (encoder_sink_read(-1, hse, compressionBuffer, 0, &newsize) < 0) {
+        heatshrink_encoder_free(hse);
+        Bfile_CloseFile_OS(hOldFile);
+        free(compressionBuffer);
+        return;
+      }
       if(!lookahead || newsize < smallestsize) {
         smallestsize = newsize;
         windowsize = wsArray[i];
@@ -726,6 +799,7 @@ void compressFile(char* oldfilename, char* newfilename, int action, int silent) 
     //created. open newly-created destination file
     hNewFile = Bfile_OpenFile_OS(tempfilenameshort, READWRITE, 0);
     if(hNewFile < 0) {
+      Bfile_DeleteEntry(tempfilenameshort);
       free(compressionBuffer);
       return;
     }
@@ -736,41 +810,78 @@ void compressFile(char* oldfilename, char* newfilename, int action, int silent) 
     {
       //cancel
       Bfile_CloseFile_OS(hNewFile); // close the new file we had opened
+      Bfile_DeleteEntry(tempfilenameshort);
       free(compressionBuffer);
       return;
     }
     
-    //File to copy is open, destination file is created and open.
-    if(action) {
+    // File to copy is open, destination file is created and open.  Do not
+    // publish a partial result: Bfile_ReadFile_OS and the heatshrink APIs can
+    // report errors, and a negative file-read result must never become a huge
+    // unsigned size passed to the decoder.
+    int transformFailed = 0;
+    if (Bfile_SeekFile_OS(hOldFile, 0) < 0 ||
+        Bfile_SeekFile_OS(hNewFile, 0) < 0) {
+      transformFailed = 1;
+    } else if(action) {
       // DECOMPRESS
-      // check file header, jumping it at the same time
-      unsigned char header[16] = "";
-      // 6: 4 bytes for original filesize and 2 for window size and lookahead
-      int chl = sizeof(COMPRESSED_FILE_HEADER)-1+6;
-      Bfile_ReadFile_OS( hOldFile, header, chl, -1 );
-      if(strncmp((char*)header, (char*)COMPRESSED_FILE_HEADER, chl))
-        goto cleanexit; // not a compressed file
-
-      windowsize = header[chl-2];
-      lookahead = header[chl-1];
-      heatshrink_decoder *hsd = heatshrink_decoder_alloc(256, windowsize, lookahead);
-      if (hsd == NULL) goto cleanexit;
-      HSD_finish_res fres;
-      while(1) {
-        unsigned char in_buf[FILE_COMPORIGBUF+5];
-        unsigned int read_sz = Bfile_ReadFile_OS( hOldFile, in_buf, FILE_COMPORIGBUF, -1 );
-        if (!read_sz) {
-          fres = heatshrink_decoder_finish(hsd);
-          if (fres < 0) { goto cleanexit; }
-          if (fres == HSDR_FINISH_DONE) break;
+      // check file header, advancing the source cursor at the same time
+      compressionBuffer = (unsigned char*)malloc(FILE_COMPORIGBUF + 5);
+      if (compressionBuffer == NULL) {
+        transformFailed = 1;
+      } else {
+        unsigned char header[16] = "";
+        // 6: 4 bytes for original filesize and 2 for window size and lookahead
+        int chl = sizeof(COMPRESSED_FILE_HEADER)-1+6;
+        int headerRead = Bfile_ReadFile_OS(hOldFile, header, chl, -1);
+        if (headerRead != chl ||
+            strncmp((char*)header, (char*)COMPRESSED_FILE_HEADER, chl)) {
+          transformFailed = 1; // not a compressed file or a short header
         } else {
-            if (decoder_sink_read(hNewFile, hsd, in_buf, read_sz)) break;
+          unsigned int expectedOutputSize =
+              ((unsigned int)header[chl-6] << 24) |
+              ((unsigned int)header[chl-5] << 16) |
+              ((unsigned int)header[chl-4] << 8) |
+              (unsigned int)header[chl-3];
+          windowsize = header[chl-2];
+          lookahead = header[chl-1];
+          heatshrink_decoder *hsd =
+              heatshrink_decoder_alloc(256, windowsize, lookahead);
+          if (hsd == NULL) {
+            transformFailed = 1;
+          } else {
+            HSD_finish_res fres;
+            while(!transformFailed) {
+              int read_sz = Bfile_ReadFile_OS(hOldFile, compressionBuffer,
+                                              FILE_COMPORIGBUF, -1);
+              if (read_sz < 0) {
+                transformFailed = 1;
+                break;
+              }
+              if (!read_sz) {
+                fres = heatshrink_decoder_finish(hsd);
+                if (fres < 0) {
+                  transformFailed = 1;
+                  break;
+                }
+                if (fres == HSDR_FINISH_DONE) break;
+              } else if (decoder_sink_read(hNewFile, hsd, compressionBuffer,
+                                            (size_t)read_sz) < 0) {
+                transformFailed = 1;
+                break;
+              }
+            }
+            if (!transformFailed &&
+                (unsigned int)Bfile_TellFile_OS(hNewFile) != expectedOutputSize)
+              transformFailed = 1;
+            heatshrink_decoder_free(hsd);
+          }
         }
       }
-      heatshrink_decoder_free(hsd);
     } else {
       // COMPRESS
-      // we can't write header directly because source buffers for WriteFile can't be in ROM
+      // We cannot write the header directly because the source buffer for
+      // WriteFile must be writable RAM rather than a read-only literal.
       unsigned char header[16];
       strcpy((char*)header, (char*)COMPRESSED_FILE_HEADER);
       // write uncompressed filesize to header
@@ -781,22 +892,51 @@ void compressFile(char* oldfilename, char* newfilename, int action, int silent) 
       header[len+3] = origfilesize & 0xFF;
       header[len+4] = windowsize;
       header[len+5] = lookahead;
-      Bfile_WriteFile_OS(hNewFile, header, len+6);
-      heatshrink_encoder *hse = heatshrink_encoder_alloc(windowsize, lookahead);
-      if (hse == NULL) goto cleanexit;
-      while(1) {
-        unsigned int read_sz = Bfile_ReadFile_OS( hOldFile, compressionBuffer, FILE_COMPORIGBUF, -1 );
-        if(encoder_sink_read(hNewFile, hse, compressionBuffer, read_sz, NULL)) break;
-        if(!read_sz) break;
+      int headerLength = len + 6;
+      if (Bfile_WriteFile_OS(hNewFile, header, headerLength) != headerLength) {
+        transformFailed = 1;
+      } else {
+        heatshrink_encoder *hse =
+            heatshrink_encoder_alloc(windowsize, lookahead);
+        if (hse == NULL) {
+          transformFailed = 1;
+        } else {
+          while(!transformFailed) {
+            int read_sz = Bfile_ReadFile_OS(hOldFile, compressionBuffer,
+                                            FILE_COMPORIGBUF, -1);
+            if (read_sz < 0) {
+              transformFailed = 1;
+              break;
+            }
+            if (encoder_sink_read(hNewFile, hse, compressionBuffer,
+                                  (size_t)read_sz, NULL) < 0) {
+              transformFailed = 1;
+              break;
+            }
+            if (!read_sz) break;
+          }
+          heatshrink_encoder_free(hse);
+        }
       }
-      heatshrink_encoder_free(hse);
     }
-    //done compressing, close files.
-cleanexit:    
+
+    // Done transforming. Close files and release the transfer buffer before
+    // deciding whether the temporary file is safe to publish.
     Bfile_CloseFile_OS(hOldFile);
     Bfile_CloseFile_OS(hNewFile);
-    // now rename the temp file to the correct file name
-    Bfile_RenameEntry(tempfilenameshort , newfilenameshort);
+    if (compressionBuffer != NULL) {
+      free(compressionBuffer);
+      compressionBuffer = NULL;
+    }
+    if (transformFailed) {
+      Bfile_DeleteEntry(tempfilenameshort);
+      return;
+    }
+    // Rename only a complete, verified temporary file.
+    if (Bfile_RenameEntry(tempfilenameshort, newfilenameshort) < 0) {
+      Bfile_DeleteEntry(tempfilenameshort);
+      return;
+    }
 
     if(!silent) {
       mMsgBoxPush(5);
@@ -818,6 +958,7 @@ cleanexit:
 }
 
 int isFileCompressed(char* filename, int* origfilesize) {
+  StorageScope storageScope;
   if(!strEndsWith(filename, (char*)COMPRESSED_FILE_EXTENSION)) return 0;
   int hFile = fileOpen(filename); // Get handle for the old file
   if(hFile < 0) return 0;
@@ -834,6 +975,7 @@ int isFileCompressed(char* filename, int* origfilesize) {
 // wrapper around Bfile_OpenFile_OS that takes a "normal" string directly
 // returns a file handle or the same error codes as Bfile_OpenFile_OS
 int fileOpen(const char* filename) {
+  StorageScope storageScope;
   unsigned short pFile[MAX_FILENAME_SIZE];
   Bfile_StrToName_ncpy(pFile, filename, MAX_FILENAME_SIZE); 
   return Bfile_OpenFile_OS(pFile, READWRITE, 0);
@@ -846,6 +988,7 @@ extern "C" {
 /* read and scan a file for definitions */
 void PicocPlatformScanFile(const char *filename)
 {
+    StorageScope storageScope;
     char* asrc = NULL;
     //Get file contents
     int hFile = fileOpen(filename); // Get handle

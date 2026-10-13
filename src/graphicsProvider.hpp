@@ -34,6 +34,29 @@ void closeProgressMessage();
 void printCentered(char* text, int y, int FGC, int BGG);
 void clearLine(int x, int y, color_t color=COLOR_WHITE);
 void mPrintXY(int x, int y, const char*msg, int mode, int color);
+void mPrintMini(int* x, int* y, const char* msg, int mode,
+                unsigned int colorMask, int arg5, int arg6,
+                int fg, int bg, int draw, int arg10);
+// These variants deliberately bypass Utilities' message table.  They are for
+// short ASCII metadata and numbers; passing a GB18030 translation to the
+// mini-mini renderer is not reliable on all CG50 OS revisions.
+void mPrintMiniRaw(int* x, int* y, const char* msg, int mode,
+                   unsigned int colorMask, int arg5, int arg6,
+                   int fg, int bg, int draw, int arg10);
+void mPrintMiniMini(int* x, int* y, const char* msg, int mode,
+                    int color, int draw);
+// PrintMiniMini normally adds 24 pixels for the status area. Use this helper
+// when x/y are already absolute LCD pixel coordinates.
+void mPrintMiniMiniAt(int* x, int* y, const char* msg, int mode,
+                      int color, int draw);
+void mPrintMiniMiniRawAt(int* x, int* y, const char* msg, int mode,
+                         int color, int draw);
+// Render compact metadata without allowing a long field to cross the LCD
+// edge. maxWidth is measured from the supplied x coordinate.
+void mPrintMiniMiniClippedAt(int* x, int* y, const char* msg, int mode,
+                             int color, int maxWidth, int draw);
+void mPrintMiniMiniRawClippedAt(int* x, int* y, const char* msg, int mode,
+                                int color, int maxWidth, int draw);
 void multiPrintXY(int x, int y, const char* msg, int mode, int color);
 void multiPrintMini(int x, int y, const char* msg, int fgcolor=COLOR_BLACK);
 void mMsgBoxPush(int lines);

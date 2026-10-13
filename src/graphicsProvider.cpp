@@ -223,7 +223,9 @@ static const color_t fullColorsForText[] =
 {COLOR_BLACK, COLOR_BLUE, COLOR_LIMEGREEN, COLOR_CYAN, COLOR_RED,
   COLOR_MAGENTA, COLOR_YELLOW, COLOR_LIGHTGRAY};
 int textColorToFullColor(int textcolor) {
-  return fullColorsForText[textcolor % sizeof(fullColorsForText)];
+  const int colorCount = sizeof(fullColorsForText) / sizeof(fullColorsForText[0]);
+  if (textcolor < 0) textcolor = 0;
+  return fullColorsForText[textcolor % colorCount];
 }
 
 void progressMessage(const char* message, int cur, int total) {
@@ -257,7 +259,8 @@ void clearLine(int x, int y, color_t color) {
 }
 
 void mPrintXY(int x, int y,const char*msg, int mode, int color) {
-  char nmsg[70];
+  char nmsg[160];
+  if (msg == NULL || y < 0 || y > 7) return;
   const char* localized = localizeText(msg);
   int useChineseFont = isChineseLanguage() &&
                        (localized != msg || isChineseText(localized));
@@ -275,6 +278,123 @@ void mPrintXY(int x, int y,const char*msg, int mode, int color) {
   PrintXY(x, y, nmsg, mode, color );
 }
 
+// PrintMini accepts multibyte text directly when GB18030 is enabled. Unlike
+// PrintXY, it does not consume a two-byte font-selector prefix; adding the
+// PrintXY prefix here would render the prefix as visible garbage and can make
+// the first characters appear truncated on CG50.
+static const char* prepareMiniText(const char* msg) {
+  if (msg == NULL) return msg;
+  return localizeText(msg);
+}
+
+void mPrintMini(int* x, int* y, const char* msg, int mode,
+                unsigned int colorMask, int arg5, int arg6,
+                int fg, int bg, int draw, int arg10) {
+  if (msg == NULL) return;
+  PrintMini(x, y, prepareMiniText(msg), mode, colorMask, arg5, arg6,
+            fg, bg, draw, arg10);
+}
+
+void mPrintMiniRaw(int* x, int* y, const char* msg, int mode,
+                   unsigned int colorMask, int arg5, int arg6,
+                   int fg, int bg, int draw, int arg10) {
+  if (msg == NULL) return;
+  PrintMini(x, y, msg, mode, colorMask, arg5, arg6, fg, bg, draw, arg10);
+}
+
+void mPrintMiniMini(int* x, int* y, const char* msg, int mode,
+                    int color, int draw) {
+  if (msg == NULL) return;
+  PrintMiniMini(x, y, prepareMiniText(msg), mode, color, draw);
+}
+
+void mPrintMiniMiniAt(int* x, int* y, const char* msg, int mode,
+                      int color, int draw) {
+  if (msg == NULL) return;
+  mPrintMiniMini(x, y, msg, mode | 0x40, color, draw);
+}
+
+void mPrintMiniMiniRawAt(int* x, int* y, const char* msg, int mode,
+                         int color, int draw) {
+  if (msg == NULL) return;
+  PrintMiniMini(x, y, msg, mode | 0x40, color, draw);
+}
+
+static int measureMiniMiniWidth(const char* msg, int mode, int color,
+                                int localized) {
+  int measuredX = 0;
+  int measuredY = 0;
+  // The last syscall argument is simulate: nonzero measures without drawing.
+  if (localized) {
+    mPrintMiniMiniAt(&measuredX, &measuredY, msg, mode, color, 1);
+  } else {
+    mPrintMiniMiniRawAt(&measuredX, &measuredY, msg, mode, color, 1);
+  }
+  return measuredX;
+}
+
+static int trimTextCharacter(const char* text, int length) {
+  if (text == NULL || length <= 0) return 0;
+  length--;
+  // Metadata is normally ASCII, but G3A names may contain a GBK pair.  Do
+  // not leave a dangling lead byte when building the clipped preview.
+  if (length > 0) {
+    unsigned char lead = (unsigned char)text[length - 1];
+    if (lead >= 0x81 && lead <= 0xFE) length--;
+  }
+  return length;
+}
+
+static void mPrintMiniMiniClippedAtInternal(int* x, int* y, const char* msg,
+                                             int mode, int color, int maxWidth,
+                                             int draw, int localized) {
+  char clipped[128];
+  const char ellipsis[] = "...";
+  int sourceLength;
+  int length;
+  int prefixLength;
+
+  if (x == NULL || y == NULL || msg == NULL || maxWidth <= 0) return;
+  sourceLength = (int)strlen(msg);
+  length = sourceLength < (int)sizeof(clipped) - 1 ?
+           sourceLength : (int)sizeof(clipped) - 1;
+  memcpy(clipped, msg, length);
+  clipped[length] = 0;
+
+  if (sourceLength <= length &&
+      measureMiniMiniWidth(clipped, mode, color, localized) <= maxWidth) {
+    if (localized) mPrintMiniMiniAt(x, y, clipped, mode, color, draw);
+    else mPrintMiniMiniRawAt(x, y, clipped, mode, color, draw);
+    return;
+  }
+
+  prefixLength = length > 3 ? length - 3 : 0;
+  while (prefixLength > 0) {
+    memcpy(clipped + prefixLength, ellipsis, sizeof(ellipsis));
+    if (measureMiniMiniWidth(clipped, mode, color, localized) <= maxWidth) break;
+    prefixLength = trimTextCharacter(clipped, prefixLength);
+  }
+  if (prefixLength <= 0) {
+    if (measureMiniMiniWidth(ellipsis, mode, color, localized) <= maxWidth) {
+      strcpy(clipped, ellipsis);
+    } else {
+      clipped[0] = 0;
+    }
+  }
+  if (localized) mPrintMiniMiniAt(x, y, clipped, mode, color, draw);
+  else mPrintMiniMiniRawAt(x, y, clipped, mode, color, draw);
+}
+
+void mPrintMiniMiniClippedAt(int* x, int* y, const char* msg, int mode,
+                             int color, int maxWidth, int draw) {
+  mPrintMiniMiniClippedAtInternal(x, y, msg, mode, color, maxWidth, draw, 1);
+}
+
+void mPrintMiniMiniRawClippedAt(int* x, int* y, const char* msg, int mode,
+                                int color, int maxWidth, int draw) {
+  mPrintMiniMiniClippedAtInternal(x, y, msg, mode, color, maxWidth, draw, 0);
+}
+
 void multiPrintXY(int x, int y, const char* msg, int mode, int color) {
   char token[50];
   while(*msg) {
@@ -287,7 +407,7 @@ void multiPrintMini(int x, int y, const char* msg, int fgcolor) {
   char token[100];
   while(*msg) {
     msg = toksplit((char*)msg, '\n', token, 100);
-    PrintMini(&x, &y, token, 0x02, 0xFFFFFFFF, 0, 0, fgcolor, COLOR_WHITE, 1, 0);
+    mPrintMini(&x, &y, token, 0x02, 0xFFFFFFFF, 0, 0, fgcolor, COLOR_WHITE, 1, 0);
     x=0; y += 17;
   }
 }
@@ -318,6 +438,11 @@ int getMsgBoxCount() {
 }
 
 void drawScreenTitle(const char* title, const char* subtitle) {
+  // Child screens can replace only the subtitle (for example Amount: or
+  // Time:). Preserve the main title in that case, while always clearing the
+  // subtitle row so shorter text cannot leave stale glyphs behind.
+  if(title != NULL) drawRectangle(0, 24, LCD_WIDTH_PX, 24, COLOR_WHITE);
+  drawRectangle(0, 48, LCD_WIDTH_PX, 24, COLOR_WHITE);
   if(title != NULL) mPrintXY(1, 1, title, TEXT_MODE_TRANSPARENT_BACKGROUND, TEXT_COLOR_BLUE);
   if(subtitle != NULL) mPrintXY(1, 2, subtitle, TEXT_MODE_TRANSPARENT_BACKGROUND, TEXT_COLOR_BLACK);
 }

@@ -42,8 +42,17 @@ Thumbs.db
 *~
 .directory
 
+# The CG50 icon source directory is intentionally named "icons".  The
+# legacy Icon? rule above would otherwise ignore it as an OS-generated folder.
+!assets/
+!assets/icons/
+!assets/icons/*.png
+
 # sublime text
 *.sublime-project
 *.sublime-workspace
 .tags
 .tags_sorted_by_file
+
+.build/
+dist/

@@ -21,6 +21,7 @@
 #include "selectorGUI.hpp"
 #include "calendarGUI.hpp"
 #include "menuGUI.hpp"
+#include "storageProvider.hpp"
 
 struct WeekCalendarBufferGuard {
   SimpleCalendarEvent*& events;
@@ -59,6 +60,8 @@ int sm, sd = 0;
 int dateselRes = 0; //whether user aborted date selection (0) or not (1)
 
 void viewCalendar(int dateselection) {
+  StorageGuard storageGuard = {0};
+  storageOperationBegin(&storageGuard);
   int res = 0;
   int type = getSetting(SETTING_DEFAULT_CALENDAR_VIEW);
   if(dateselection) type = 1; // week view can't act as date selector for now
@@ -70,8 +73,10 @@ void viewCalendar(int dateselection) {
     }
     if(type) res = viewMonthCalendar(dateselection);
     else res = viewWeekCalendar();
-    if(res) type=!type; else return;
+    if(res) type=!type;
+    else break;
   }
+  storageOperationEnd(&storageGuard);
 }
 
 int viewMonthCalendar(int dateselection) {
@@ -2047,6 +2052,7 @@ void calendarToolsMenu(int y, int m, int d) {
 }
 
 void databaseRepairScreen() {
+  StorageScope storageScope;
   textArea text;
   text.title = (char*)"Database repair";
 
@@ -2119,7 +2125,7 @@ void databaseRepairScreen() {
   strcpy(buffer, CALENDARFOLDER"\\*.pce");
   
   file_type_t fileinfo;
-  int findhandle;
+  int findhandle = -1;
   Bfile_StrToName_ncpy(path, buffer, MAX_FILENAME_SIZE+1);
   int ret = Bfile_FindFirst_NON_SMEM((const char*)path, &findhandle, (char*)found, &fileinfo);
   int loopc = 9;
@@ -2147,7 +2153,7 @@ void databaseRepairScreen() {
     }
     ret = Bfile_FindNext_NON_SMEM(findhandle, (char*)found, (char*)&fileinfo);
   }
-  Bfile_FindClose(findhandle);
+  if (findhandle >= 0) Bfile_FindClose(findhandle);
   // update totals, because they do not include the last file checked
   itoa((int)checkedfiles, (unsigned char*)buffer1);
   elem[2].text = buffer1;
@@ -2202,6 +2208,7 @@ int trimCalendarCategoryHelper(EventDate* date, const int delcat) {
   return 0;
 }
 void databaseTrimScreen() {
+  StorageScope storageScope;
   textArea text;
   text.title = (char*)"Trim database";
   text.type = TEXTAREATYPE_INSTANT_RETURN;
@@ -2275,7 +2282,7 @@ void databaseTrimScreen() {
     strcpy(buffer, CALENDARFOLDER"\\*.pce");
     
     file_type_t fileinfo;
-    int findhandle;
+    int findhandle = -1;
     Bfile_StrToName_ncpy(path, buffer, MAX_FILENAME_SIZE+1);
     int ret = Bfile_FindFirst_NON_SMEM((const char*)path, &findhandle, (char*)found, &fileinfo);
     while(!ret) {
@@ -2340,7 +2347,7 @@ void databaseTrimScreen() {
       }
       ret = Bfile_FindNext_NON_SMEM(findhandle, (char*)found, (char*)&fileinfo);
     }
-    Bfile_FindClose(findhandle);
+    if (findhandle >= 0) Bfile_FindClose(findhandle);
   }
   mMsgBoxPush(4);
   multiPrintXY(3, 2, "DB trimming\ncompleted\nsuccessfully.", TEXT_MODE_TRANSPARENT_BACKGROUND,

@@ -101,5 +101,8 @@ unsigned char getSetting(const int setting);
 void setSetting(const int setting, const unsigned char value, const int autosave);
 int loadSettings();
 void saveSettings();
+int hasSettingsBackup();
+int backupSettings();
+int restoreSettingsBackup();
 
 #endif

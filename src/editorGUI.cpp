@@ -21,6 +21,7 @@
 #include "fileProvider.hpp"
 #include "fileGUI.hpp"
 #include "sha1.h"
+#include "storageProvider.hpp"
 
 struct TextEditorBufferGuard {
   char* buffer;
@@ -29,6 +30,7 @@ struct TextEditorBufferGuard {
 };
 
 void textfileEditor(char* filename, char* basefolder) {
+  StorageScope storageScope;
   int newfile = (filename == NULL);
   char* sText = (char*)malloc((size_t)TEXT_BUFFER_SIZE + 1);
   TextEditorBufferGuard bufferGuard(sText);

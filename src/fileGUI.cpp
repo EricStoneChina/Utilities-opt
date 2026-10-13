@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <alloca.h>
 
 #include "constantsProvider.hpp"
 #include "settingsProvider.hpp"
@@ -28,6 +27,7 @@
 #include "editorGUI.hpp"
 #include "imageGUI.hpp"
 #include "linkProvider.hpp"
+#include "storageProvider.hpp"
 #include "sprites.h"
 #ifdef ENABLE_PICOC_SUPPORT
 extern "C" {
@@ -36,6 +36,8 @@ extern "C" {
 #endif
 
 void fileManager() {
+  StorageGuard storageGuard = {0};
+  storageOperationBegin(&storageGuard);
   int res = 1;
   int itemsinclip = 0;
   int shownMainMemHelp = 0;
@@ -83,6 +85,7 @@ void fileManager() {
       #endif
     }
   }
+  storageOperationEnd(&storageGuard);
 }
 int smemfree = 0;
 struct FileMenuBufferGuard {
@@ -97,6 +100,7 @@ struct FileMenuBufferGuard {
 };
 
 void getFileManagerStatus(char* title, int itemsinclip, int ismanager) {
+  StorageScope storageScope;
   char titleBuffer[120];
   if(!itemsinclip) {
     itoa(smemfree, (unsigned char*)title);
@@ -118,6 +122,7 @@ void getFileManagerStatus(char* title, int itemsinclip, int ismanager) {
 
 int fileManagerChild(char* browserbasepath, int* itemsinclip, int* fileAction,
                      int* shownMainMemHelp, File* clipboard, char* filetoedit) {
+  StorageScope storageScope;
   Menu menu;
   MenuItemIcon icontable[12];
   buildIconTable(icontable);
@@ -495,6 +500,7 @@ int deleteFilesPrompt(File* files, Menu* menu) {
 }
 
 int newFolderScreen(char* browserbasepath) {
+  StorageScope storageScope;
   //browserbasepath: folder we're working at
   //reload the files array after using this function!
   //returns 1 if user creates folder, 0 if aborts.
@@ -526,6 +532,7 @@ int newFolderScreen(char* browserbasepath) {
 }
 
 int newG3Pscreen(char* browserbasepath) {
+  StorageScope storageScope;
   //browserbasepath: folder we're working at
   //reload the files array after using this function!
   //returns 1 if user creates file, 0 if aborts.
@@ -782,6 +789,7 @@ int searchFilesScreen(char* browserbasepath, char* filetojump, int itemsinclip) 
 }
 
 int viewFileInfo(File* file, int allowEdit, int itemsinclip, int allowUpDown) {
+  StorageScope storageScope;
   // returns 0 if user exits.
   // returns 1 if user wants to edit the file
   // returns 2 if user compressed or decompressed the file
@@ -996,6 +1004,7 @@ int viewFileInfo(File* file, int allowEdit, int itemsinclip, int allowUpDown) {
 }
 
 void viewFileAsText(char* filename) {
+  StorageScope storageScope;
   unsigned char* asrc = NULL;
   //Get file contents
   int hFile = fileOpen(filename); // Get handle

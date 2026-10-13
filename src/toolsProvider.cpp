@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <alloca.h>
 
 #include "toolsProvider.hpp" 
 #include "settingsProvider.hpp"
@@ -21,6 +20,7 @@
 #include "timeProvider.hpp"
 #include "stringsProvider.hpp"
 #include "sha1.h"
+#include "storageProvider.hpp"
 
 long long int llabs(long long int i) {
   if(i < 0) i = -i;
@@ -83,6 +83,7 @@ void walletNameToPath(char* dest, char* orig) {
 }
 
 void getWalletBalance(Currency* balance, const char* wallet) {
+  StorageScope storageScope;
   char file[MAX_FILENAME_SIZE];
   strcpy(file, wallet);
   strcat(file, (char*)"\\Balance");
@@ -95,6 +96,7 @@ void getWalletBalance(Currency* balance, const char* wallet) {
 }
 
 void setWalletBalance(Currency* balance, const char* wallet) {
+  StorageScope storageScope;
   char file[MAX_FILENAME_SIZE];
   strcpy(file, wallet);
   strcat(file, (char*)"\\Balance");
@@ -108,6 +110,7 @@ void setWalletBalance(Currency* balance, const char* wallet) {
 }
 
 int getCurrentWallet(char* wallet) {
+  StorageScope storageScope;
   // puts wallet folder in the buffer wallet points to, and returns 1
   // or returns 0 if there's no wallet yet
   char statusfile[MAX_FILENAME_SIZE];
@@ -124,6 +127,7 @@ int getCurrentWallet(char* wallet) {
 }
 
 void setCurrentWallet(char* wallet) {
+  StorageScope storageScope;
   // sets current wallet folder to the specified one
   // doesn't check that the wallet folder actually exists
   char statusfile[MAX_FILENAME_SIZE];
@@ -169,6 +173,7 @@ void calendarEventToTransaction(Transaction* tx, CalendarEvent* event) {
 }
 
 int getWalletTransactions(char* wallet, Transaction* tx, int limit) {
+  StorageScope storageScope;
   // puts in the array of transactions "tx" "limit" number of transactions,
   // starting by the most recent (they come ordered because they are put in order in the file)
   // returns the number of transactions
@@ -189,6 +194,7 @@ int getWalletTransactions(char* wallet, Transaction* tx, int limit) {
 }
 
 void addTransaction(Transaction* tx, char* wallet) {
+  StorageScope storageScope;
   // adds a single transaction "tx" to the specified wallet
   // update balance:
   Currency balance;
@@ -252,6 +258,7 @@ void addTransaction(Transaction* tx, char* wallet) {
 }
 
 void replaceWalletTransactions(Transaction* txs, char* wallet, int count) {
+  StorageScope storageScope;
   CalendarEvent* events = allocateCalendarEventBuffer();
   if(events == NULL) return;
   for(int i = 0; i < count; i++) {
@@ -264,6 +271,7 @@ void replaceWalletTransactions(Transaction* txs, char* wallet, int count) {
 }
 
 void deleteTransaction(Transaction* txs, char* wallet, int count, int pos) {
+  StorageScope storageScope;
   // undo effect of transaction in wallet balance:
   Currency balance;
   getWalletBalance(&balance, wallet);
@@ -286,6 +294,7 @@ void deleteTransaction(Transaction* txs, char* wallet, int count, int pos) {
 }
 
 void createWallet(char* name, Currency* balance) {
+  StorageScope storageScope;
   // creates a wallet without checking if it already exists
   // balance is the initial balance in internal (memory) format
   char folder[MAX_FILENAME_SIZE];
@@ -308,6 +317,7 @@ void createWallet(char* name, Currency* balance) {
 }
 
 void deleteWallet(char* wallet) {
+  StorageScope storageScope;
   unsigned short path[MAX_FILENAME_SIZE+1];
   Bfile_StrToName_ncpy(path, wallet, MAX_FILENAME_SIZE+1);
   Bfile_DeleteEntry(path);
@@ -400,6 +410,7 @@ unsigned int computeTOTP(totp* t) {
 }
 
 int loadTOTPs(totp* ts) {
+  StorageScope storageScope;
   CalendarEvent* events = allocateCalendarEventBuffer();
   if(events == NULL) return 0;
   EventDate date;
@@ -421,6 +432,7 @@ int loadTOTPs(totp* ts) {
 }
 
 void addTOTP(char* name, char* key) {
+  StorageScope storageScope;
   // key is the base32 encoded key. will not be checked for validity
   CalendarEvent event;
   strcpy((char*)event.title, name);
@@ -432,6 +444,7 @@ void addTOTP(char* name, char* key) {
 }
 
 void removeTOTP(int index) {
+  StorageScope storageScope;
   EventDate date;
   CalendarEvent* events = allocateCalendarEventBuffer();
   if(events == NULL) return;
@@ -441,6 +454,7 @@ void removeTOTP(int index) {
 }
 
 void renameTOTP(int index, char* newname) {
+  StorageScope storageScope;
   EventDate date;
   CalendarEvent* events = allocateCalendarEventBuffer();
   if(events == NULL) return;

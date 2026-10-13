@@ -21,6 +21,7 @@
 #include "fileProvider.hpp"
 #include "stringsProvider.hpp"
 #include "sha2.h"
+#include "storageProvider.hpp"
 
 void hashPassword(unsigned char* password, unsigned char* hash) {
   unsigned char salted[256+8];
@@ -30,6 +31,7 @@ void hashPassword(unsigned char* password, unsigned char* hash) {
 }
 
 int comparePasswordHash(unsigned char* inputPassword) {
+  StorageScope storageScope;
   //returns values defined as RETURN_PASSWORD_*
   //Load hash from SMEM
   unsigned char smemHash[32] = "";
@@ -51,6 +53,7 @@ int comparePasswordHash(unsigned char* inputPassword) {
   }
 }
 int savePassword(unsigned char* password) {
+  StorageScope storageScope;
   unsigned char hash[32] = "";
   hashPassword(password, hash);
   //now that we hashed, save in the storage memory.
@@ -80,6 +83,7 @@ int savePassword(unsigned char* password) {
 }
 
 int isPasswordSet(void) {
+  StorageScope storageScope;
   //returns 1 if user has already set a code for locking the calc, 0 if not.
   int hFile = fileOpen(SMEMHASHFILE);
   if(hFile < 0) return 0;

@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <alloca.h>
 extern "C" {
 #include <setjmp.h>
 }
@@ -55,6 +54,18 @@ void saveVRAMandCallSettings() {
   else if(vrambackup!=NULL) MsgBoxMoveWB(vrambackup, 0, 0, LCD_WIDTH_PX-1, LCD_HEIGHT_PX-24-1, 0);
   if(vrambackup!=NULL) free(vrambackup);
 }
+
+void resetFunctionKeyMappings() {
+  // Built-in applications may replace the six F-key descriptors. Restore a
+  // neutral mapping whenever control returns to the add-in.
+  static const unsigned int default_fkeys[] = {
+    0x0000FFFF, 0, 0x0000FFFF, 0, 0x0000FFFF, 0,
+    0x0000FFFF, 0, 0x0000FFFF, 0, 0x0000FFFF, 0
+  };
+  Set_FKeys1(0, (unsigned int*)default_fkeys);
+  Set_FKeys2(0);
+}
+
 void mGetKey(int* key, int darkenStatus) {
   //managed GetKey. allows for entering the settings menu from most points in the add-in.
   while (1) {

@@ -2,7 +2,7 @@
 
 The Utilities add-in enhances your Casio Prizm calculator by providing functionality not originally found in the OS, or by providing enhanced alternatives to existing functionality.
 
-This fork is tuned for the fx-CG 50 and continues to support the original data formats. It adds a Chinese/English interface switch, a CG50-styled startup logo, and a device dashboard for quickly checking the calculator's model, free storage, main memory, battery voltage, and whether it is running on real hardware.
+This fork is tuned for the fx-CG 50 and continues to support the original data formats. It adds a Chinese/English interface switch, CG50-compatible icon and startup artwork, and a safety-first device dashboard for checking the calculator's model, free storage, main memory, battery voltage, and whether it is running on real hardware.
 
 ## Features
 
@@ -35,16 +35,32 @@ This fork is tuned for the fx-CG 50 and continues to support the original data f
   - **Memory usage viewer** - graphic display of the memory usage (main and storage) of the calculator.
 
   - **Device dashboard** - a compact health view for the fx-CG 50, showing model, storage and main-memory headroom, battery voltage, and emulator status.
+
+  - **Interface diagnostics** - inspect the keyboard matrix, SHIFT/EXIT combination state, timer heartbeat, Run-Mat counters, and the last recorded interface error. Press F2 to review the eight most recent interface events.
+
+  - **Application audit** - scan .g3a files in read-only mode and inspect metadata, icons, duplicate names, header validity, and checksums.
+
+    - Press F4 on a selected add-in to view its native 92x64 RGB565 icon; long metadata is clipped to the CG50 screen edge.
+
+    - Press F5 on a selected add-in to quarantine it only after two confirmations; Utilities creates a non-overwriting backup first and never removes the original when that backup fails.
+
+    - Press Ctrl+F5 from the application list to restore a quarantined add-in; an existing root file is never overwritten and the backup is retained after a successful restore.
+
+    - The advanced Add-In Manager uses the same backup-and-quarantine path for its remove action.
+
+  - **Screen and performance lab** - run RGB565/pixel/screenshot tools, full fill/refresh and frame-rate tests, and compare arithmetic, memory, VRAM, timer, and file-I/O timings.
+
+  - **Configuration backup** - back up and restore only Utilities settings, with version checks and a rollback copy before restore.
   
   - **Function key color adjuster** - change the color of the function key labels throughout the OS.
   
-  - **System information viewer** - view the OS and bootloader version and timestamps, calculator model information, Renesas CPU version registers and the unique device ID. You can also view the current user information (as set on the System menu and displayed during power-off) and its history, including "passwords".
+  - **System information viewer** - view the OS version/build, calculator model, real-hardware status, supported capability flags, and device ID through the CG50 platform probe. Legacy fixed-address bootloader/CPU and sensitive registered-user/password-history fields are intentionally not read or displayed.
   
-  - **Calculator lock** - "lock" the calculator with a password to avoid having curious people messing around with your calculator. Not suitable as a high-security lock (for now, it's easy to bypass). You can set Utilities to turn off the calculator after locking. And after unlocking, you can set it to open Run-Mat or ask you if you want to. To return from Run-Mat back to Utilities, press Shift and Exit at the same time.
+  - **Calculator lock** - "lock" the calculator with a password to avoid having curious people messing around with your calculator. Not suitable as a high-security lock (for now, it's easy to bypass). You can set Utilities to turn off the calculator after locking. And after unlocking, you can set it to open Run-Mat or ask you if you want to. To return from Run-Mat back to Utilities, press EXIT; SHIFT+EXIT, SHIFT+F6, and SHIFT+MENU are retained as compatibility paths.
   
     - If you fear that the lock function may cause problems at some point (e.g. locking yourself out during an exam), contact gbl08ma for instructions on how to disable it.
   
-  - **Add-in manager** - allows for hiding add-ins from the Main Menu without uninstalling them, when they are not necessary. Currently it is an unstable feature due to OS limitations, sometimes causing system errors. This functionality is only available when the advanced tools option is enabled.
+  - **Add-in manager** - allows for hiding add-ins from the Main Menu without uninstalling them, when they are not necessary. State changes require confirmation; removal first creates a non-overwriting backup and moves the add-in to a quarantine file. This functionality is only available when the advanced tools option is enabled.
   
   - **PicoC script execution** - only available in select editions, allows for executing scripts, written in an interpreted variant of C, that can use most of the functions of the OS and of Utilities.
   
@@ -56,7 +72,7 @@ This fork is tuned for the fx-CG 50 and continues to support the original data f
   
 ## And as a bonus...
 
-  - **Weights less than 185 KiB**, saving space on your Prizm's storage memory and speeding up its transfer between calculators. The PicoC edition has a larger file size, over 250 KiB.
+  - **A compact build of roughly 205 KiB**, saving space on your Prizm's storage memory and speeding up its transfer between calculators. The PicoC edition has a larger file size, over 250 KiB.
   
   - Really fast to start up - it's usually even faster than the built-in app Run-Mat!
   
@@ -86,9 +102,9 @@ This bit is really, really important as there are some folder names that changed
 ## Usage instructions
 Everything should be pretty much self-explanatory - Utilities is made to dispense the Read-Me :). Because of that, only less obvious things will be detailed here. To open the settings menu, press Shift+Menu while Utilities is running.
 
-The calculator lock function will guide you through the process of setting a password, the first time you use it. You can contact gbl08ma if for some reason you wish to disable this function (be prepared to follow instructions in a very exact way).
+The calculator lock function will guide you through the process of setting a password, the first time you use it. To return from Run-Mat back to Utilities, press EXIT. SHIFT+EXIT, SHIFT+F6, and SHIFT+MENU are also recognized for compatibility with older builds; the Interface Diagnostics page can show the matrix and timer state when investigating a return problem.
 
-The Add-In Manager only becomes available when the "Show advanced tools" setting is enabled. The Add-In manager is unstable because of technical limitations, and may cause system errors. If you see a System Error, you should try pressing Menu and then 1 to try to dismiss it, or you can press EXIT to reboot the calculator. Other thing that may happen with the Add-In Manager is that all add-ins will be gone from the Main Menu. If this happens, reboot the calculator to make them appear again.
+The Add-In Manager only becomes available when the "Show advanced tools" setting is enabled. Hiding an add-in changes its activation flags and asks for confirmation. Removing an add-in is deliberately implemented as a two-step backup-and-quarantine operation: the original is never deleted unless the backup has been verified, and restore never overwrites an existing root file. The underlying OS activation flags remain a CG50-specific operation, so test this feature on a spare calculator and keep the generated backup until the result is confirmed.
 
 For information on how to use PicoC on Utilities, please [go here](https://github.com/gbl08ma/utilities/wiki/PicoC-information).
 

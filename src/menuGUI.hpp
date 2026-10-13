@@ -47,7 +47,7 @@ typedef struct {
   char* title = NULL; // title to be shown on the first line if not null
   char* subtitle = NULL;
   int titleColor=TEXT_COLOR_BLUE; //color of the title
-  char* nodatamsg; // message to show when there are no menu items to display
+  char* nodatamsg=NULL; // message to show when there are no menu items to display
   int startX=1; //X where to start drawing the menu. NOTE this is not absolute pixel coordinates but rather character coordinates
   int startY=1; //Y where to start drawing the menu. NOTE this is not absolute pixel coordinates but rather character coordinates
   int width=21; // NOTE this is not absolute pixel coordinates but rather character coordinates
